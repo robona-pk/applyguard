@@ -136,7 +136,7 @@ function saveProfile() {
 function normalizeJob(raw, source) {
   const date = raw.date || raw.publication_date || raw.created_at || raw.createdAt || raw.pubDate || raw.posted_at || NOW();
   const location = raw.candidate_required_location || raw.location || raw.jobGeo || raw.locationRestrictions?.join(', ') || 'Not specified';
-  return { id: `${source}:${raw.id || raw.guid || raw.url || raw.jobUrl || raw.title || raw.jobTitle}`, source, title: raw.title || raw.jobTitle || raw.position || 'Untitled Product role', company: raw.company_name || raw.company || raw.companyName || 'Unknown company', location, url: raw.url || raw.applicationLink || raw.jobUrl || raw.redirect_url || '', description: String(raw.description || raw.jobDescription || raw.job_description || raw.excerpt || raw.jobExcerpt || raw.snippet || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500), postedAt: date, tags: raw.tags || raw.category || raw.jobIndustry || [] };
+  return { id: `${source}:${raw.id || raw.job_id || raw.guid || raw.url || raw.jobUrl || raw.title || raw.jobTitle}`, source, title: raw.title || raw.jobTitle || raw.position || 'Untitled Product role', company: raw.company_name || raw.company || raw.companyName || 'Unknown company', location, url: raw.url || raw.source_url || raw.applicationLink || raw.jobUrl || raw.redirect_url || '', description: String(raw.description || raw.jobDescription || raw.job_description || raw.excerpt || raw.jobExcerpt || raw.snippet || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500), postedAt: date, tags: raw.tags || raw.category || raw.jobIndustry || [] };
 }
 
 async function runSearch() {
@@ -149,16 +149,19 @@ async function runSearch() {
     { name: 'Remote OK', url: 'https://remoteok.com/api', parse: x => Array.isArray(x) ? x.slice(1) : [] },
     { name: 'Jobicy · APAC', url: 'https://jobicy.com/api/v2/remote-jobs?count=200&geo=apac&tag=product', parse: x => x.jobs || [] },
     { name: 'Himalayas · India remote', url: 'https://himalayas.app/jobs/api/search?q=product%20manager&country=India&sort=recent', parse: x => x.jobs || [] },
-    { name: wantsBengaluru ? 'Hopin · Bangalore' : 'Hopin · India', url: wantsBengaluru ? 'https://api.hopinjobs.com/api/jobs?is_unofficial=true&location=Bangalore%2C%20India' : 'https://api.hopinjobs.com/api/jobs?is_unofficial=true', parse: x => x.jobs || [] }
+    { name: wantsBengaluru ? 'Hopin · Bangalore' : 'Hopin · India', url: wantsBengaluru ? 'https://api.hopinjobs.com/api/jobs?is_unofficial=true&location=Bangalore%2C%20India' : 'https://api.hopinjobs.com/api/jobs?is_unofficial=true', parse: x => x.jobs || [] },
+    { name: 'Startup Jobs', url: '/api/startupjobs', parse: x => x.jobs || [] },
+    { name: 'Jobvetta · India', url: `/api/jobvetta?location=${encodeURIComponent((state.profile.location || 'Bengaluru').split(',')[0].trim())}`, parse: x => x.jobs || [] }
   ];
   try {
     const results = await Promise.allSettled(sources.map(async s => {
       const response = await fetch(s.url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json(); return { name: s.name, jobs: s.parse(data).map(x => normalizeJob(x, s.name)) };
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      return { name: s.name, jobs: s.parse(data).map(x => normalizeJob(x, s.name)) };
     }));
     const successful = results.filter(r => r.status === 'fulfilled');
-    const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: 'Unavailable in this browser right now' });
+    const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: r.reason?.message || 'Unavailable in this browser right now' });
     const jobs = successful.flatMap(r => r.value.jobs).filter(isProductJob);
     state.sourceRuns = runs;
     if (jobs.length) {

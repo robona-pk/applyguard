@@ -11,7 +11,8 @@ The shipped static app has no backend, account, database, or API key.
 - Paste a resume or load a TXT, Markdown, PDF, or DOCX file; parsing occurs in the browser and the resulting text/profile stay in `localStorage` in the current browser.
 - Analyze the text locally to suggest product skills, relevant industries, target roles, and achievement-shaped evidence candidates.
 - Review, edit, and save an evidence ledger. Saved evidence is the only candidate material used in job-match explanations.
-- Run an on-demand search against permitted public job feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, and Hopin's India feed. When Bengaluru/Bangalore is your saved location, Hopin is queried with its exact Bangalore location filter. Source failures are visible and do not prevent other sources from returning results.
+- Run an on-demand search against permitted public job feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, Hopin's India feed, and Startup Jobs. When Bengaluru/Bangalore is your saved location, Hopin is queried with its exact Bangalore location filter. Source failures are visible and do not prevent other sources from returning results.
+- Optionally connect Jobvetta's India job index through a Vercel Function. Its free API key is read only on the server, never exposed to the browser.
 - Filter recent jobs, deduplicate them, and rank PM roles with visible, adjustable deterministic weights.
 - See supporting skill signals, evidence items, gaps, and an explicitly non-predictive recommendation for every role.
 - Approve/reject a job locally. Approval creates an editable application packet with a missing-information checklist.
@@ -59,6 +60,12 @@ The slider weights are local, inspectable, and adjustable. The interface always 
 ## Run locally
 
 No package installation is required. Open `dist/index.html` in a modern browser. For live source requests, serve the `dist` folder with any static server if your browser restricts network requests from `file://` pages.
+
+### Enable Jobvetta India coverage in Vercel
+
+1. Create a free API key at [Jobvetta](https://www.jobvetta.com/).
+2. In the Vercel project, open **Settings → Environment Variables** and add `JOBVETTA_API_KEY` for **Production**.
+3. Redeploy. The `/api/jobvetta` Vercel Function will then search Product Manager roles in the saved location (for example, Bengaluru) without exposing the key to visitors.
 
 ## Repository structure
 
