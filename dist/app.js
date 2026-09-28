@@ -8,11 +8,13 @@ const DEFAULT_STATE = {
   resume: { text: '', fileName: '', updatedAt: null },
   profile: { name: '', roles: '', industries: '', location: '', authorization: '', signals: [], evidence: [] },
   jobs: [], decisions: {}, packet: null, audit: [], lastRun: null,
-  weights: { skills: 45, role: 20, industry: 15, seniority: 10, location: 10 },
+  weights: { skills: 55, industry: 25, seniority: 20 },
   sourceRuns: []
 };
 let state = load();
 state.jobs = compactJobs(state.jobs || []);
+state.weights = { ...DEFAULT_STATE.weights, ...Object.fromEntries(Object.entries(state.weights || {}).filter(([key]) => key in DEFAULT_STATE.weights)) };
+if (Object.values(state.weights).reduce((sum, value) => sum + value, 0) !== 100) allocateWeight('skills', state.weights.skills);
 
 function load() {
   try { return { ...structuredClone(DEFAULT_STATE), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
@@ -158,25 +160,28 @@ function assess(job) {
   const profile = state.profile; const all = `${job.title} ${job.description} ${job.tags}`.toLowerCase();
   const signalHits = (profile.signals || []).filter(signal => (SIGNALS[signal] || []).some(term => all.includes(term)));
   const evidenceHits = (profile.evidence || []).filter(item => tokens(item.text).some(term => term.length > 4 && all.includes(term))).slice(0, 3);
-  const targetRoles = tokens(profile.roles); const roleHit = targetRoles.some(term => job.title.toLowerCase().includes(term)) || /product manager|product owner/i.test(job.title);
+  const targetRoles = (profile.roles || '').split(',').map(role => role.trim().toLowerCase()).filter(Boolean);
+  const roleHit = !targetRoles.length || targetRoles.some(role => job.title.toLowerCase().includes(role));
   const industries = tokens(profile.industries); const industryHit = industries.some(term => all.includes(term));
-  const location = (profile.location || '').toLowerCase(); const locationHit = !location || /remote/i.test(job.location) && /remote/i.test(location) || tokens(location).some(term => job.location.toLowerCase().includes(term));
+  const location = (profile.location || '').toLowerCase(); const locationHit = !location || (/remote/i.test(job.location) && /remote/i.test(location)) || tokens(location).some(term => job.location.toLowerCase().includes(term));
   const skills = Math.min(state.weights.skills, Math.round((signalHits.length / Math.max(profile.signals?.length || 1, 3)) * state.weights.skills) + Math.min(10, evidenceHits.length * 4));
-  const role = roleHit ? state.weights.role : Math.round(state.weights.role * .35); const industry = industryHit ? state.weights.industry : Math.round(state.weights.industry * .45);
+  const industry = industryHit ? state.weights.industry : Math.round(state.weights.industry * .45);
   const seniority = /senior|lead|principal|director|head of/i.test(job.title) && !(profile.roles || '').toLowerCase().includes('senior') ? Math.round(state.weights.seniority * .55) : state.weights.seniority;
-  const loc = !location ? Math.round(state.weights.location * .5) : locationHit ? state.weights.location : 0;
-  const score = Math.min(100, skills + role + industry + seniority + loc);
+  const hardFailures = [];
+  if (!roleHit) hardFailures.push(`Title does not match your target role(s): ${profile.roles}.`);
+  if (!locationHit) hardFailures.push(`Location does not match your requirement: ${profile.location}.`);
+  const score = Math.min(100, skills + industry + seniority);
   const gaps = [];
   if (!signalHits.length) gaps.push('No explicit skill signal overlap was found in the verified profile.');
   if (/ai|machine learning|llm|nlp/i.test(all) && !(profile.signals || []).includes('AI / ML')) gaps.push('The role mentions AI/ML; verify direct experience before applying.');
   if (/search|relevance|query/i.test(all) && !(profile.signals || []).includes('Search / discovery')) gaps.push('The role mentions search/discovery; the profile has no explicit evidence of it.');
   if (!industryHit && profile.industries) gaps.push('The industry does not clearly match the industries you selected.');
-  const verdict = score >= 75 ? 'Strong apply' : score >= 55 ? 'Selective apply' : 'Review before applying';
-  return { score, verdict, components: { skills, role, industry, seniority, location: loc }, signalHits, evidenceHits, gaps };
+  const verdict = hardFailures.length ? 'Does not meet hard filters' : score >= 75 ? 'Strong apply' : score >= 55 ? 'Selective apply' : 'Review before applying';
+  return { score, verdict, components: { skills, industry, seniority }, signalHits, evidenceHits, gaps, hardFailures, hardPass: !hardFailures.length };
 }
 
 function renderSources() { const target = $('#sourceStatus'); const sourceRuns = state.sourceRuns.length ? state.sourceRuns : [{name:'Remotive',status:'warn',message:'Run a search to query'},{name:'Arbeitnow',status:'warn',message:'Run a search to query'},{name:'Remote OK',status:'warn',message:'Run a search to query'}]; target.innerHTML = sourceRuns.map(s => `<div class="source ${s.status}"><strong>${s.status === 'ok' ? '●' : '○'} ${escapeHtml(s.name)}</strong><span>${escapeHtml(s.message)}</span></div>`).join(''); $('#lastRun').textContent = state.lastRun ? `Last run: ${new Date(state.lastRun).toLocaleString()}` : 'No search run yet'; }
-function renderWeights() { const total = Object.values(state.weights).reduce((sum, value) => sum + value, 0); $('#weights').innerHTML = `<p class="small muted">${total}% allocated. Setting one factor to 100% sets all others to 0%.</p>` + Object.entries(state.weights).map(([key, value]) => `<div class="weight"><label>${key[0].toUpperCase()+key.slice(1)} <span>${value}%</span><input type="range" min="0" max="100" value="${value}" data-weight="${key}"></label></div>`).join(''); }
+function renderWeights() { const total = Object.values(state.weights).reduce((sum, value) => sum + value, 0); $('#weights').innerHTML = `<section class="hard-filter-note"><strong>Hard filters</strong><span>Target role and location are configured in your profile. Jobs that fail either are excluded before scoring.</span></section><p class="small muted">${total}% allocated across soft signals. Compensation is intentionally unscored until a source provides a comparable salary range.</p>` + Object.entries(state.weights).map(([key, value]) => `<div class="weight"><label>${key[0].toUpperCase()+key.slice(1)} <span>${value}%</span><input type="range" min="0" max="100" value="${value}" data-weight="${key}"></label></div>`).join(''); }
 function allocateWeight(changedKey, requested) {
   const keys = Object.keys(state.weights); const next = Math.max(0, Math.min(100, requested)); const others = keys.filter(key => key !== changedKey);
   if (next === 100) { others.forEach(key => { state.weights[key] = 0; }); state.weights[changedKey] = 100; return; }
@@ -186,8 +191,8 @@ function allocateWeight(changedKey, requested) {
   state.weights[changedKey] = next;
 }
 function renderJobs() {
-  const target = $('#jobsList'); const jobs = recentJobs().map(job => ({ job, match: assess(job) })).sort((a,b) => b.match.score - a.match.score);
-  $('#jobCount').textContent = jobs.length ? `${jobs.length} recent product roles` : '';
+  const target = $('#jobsList'); const assessed = recentJobs().map(job => ({ job, match: assess(job) })); const excluded = assessed.filter(item => !item.match.hardPass); const jobs = assessed.filter(item => item.match.hardPass).sort((a,b) => b.match.score - a.match.score);
+  $('#jobCount').textContent = jobs.length ? `${jobs.length} eligible roles${excluded.length ? ` · ${excluded.length} excluded by hard filters` : ''}` : '';
   if (!jobs.length) { target.innerHTML = '<div class="empty-state">No qualifying roles are available for this date window. Try a broader filter, run a search, or load illustrative demo jobs.</div>'; return; }
   target.innerHTML = jobs.map(({job,match}) => {
     const decision = state.decisions[job.id];
