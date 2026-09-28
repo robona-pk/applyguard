@@ -38,6 +38,13 @@ function compactJobs(jobs) {
   return [...jobs].sort((a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt)).slice(0, MAX_STORED_JOBS)
     .map(job => ({ ...job, description: String(job.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500) }));
 }
+const LOCATION_ALIASES = { bengaluru: ['bengaluru', 'bangalore'], bangalore: ['bengaluru', 'bangalore'], mumbai: ['mumbai', 'bombay'], delhi: ['delhi', 'new delhi'], gurugram: ['gurugram', 'gurgaon'], gurgaon: ['gurugram', 'gurgaon'] };
+function locationMatches(preference, jobLocation) {
+  const desired = tokens(preference); const actual = String(jobLocation || '').toLowerCase();
+  if (!desired.length) return true;
+  if (desired.includes('remote') && /remote|anywhere|worldwide/i.test(actual)) return true;
+  return desired.some(place => (LOCATION_ALIASES[place] || [place]).some(alias => actual.includes(alias)));
+}
 
 const SIGNALS = {
   'Product strategy': ['product strategy', 'roadmap', 'product vision', 'priorit'],
@@ -163,7 +170,7 @@ function assess(job) {
   const targetRoles = (profile.roles || '').split(',').map(role => role.trim().toLowerCase()).filter(Boolean);
   const roleHit = !targetRoles.length || targetRoles.some(role => job.title.toLowerCase().includes(role));
   const industries = tokens(profile.industries); const industryHit = industries.some(term => all.includes(term));
-  const location = (profile.location || '').toLowerCase(); const locationHit = !location || (/remote/i.test(job.location) && /remote/i.test(location)) || tokens(location).some(term => job.location.toLowerCase().includes(term));
+  const location = (profile.location || '').toLowerCase(); const locationHit = locationMatches(location, job.location);
   const skills = Math.min(state.weights.skills, Math.round((signalHits.length / Math.max(profile.signals?.length || 1, 3)) * state.weights.skills) + Math.min(10, evidenceHits.length * 4));
   const industry = industryHit ? state.weights.industry : Math.round(state.weights.industry * .45);
   const seniority = /senior|lead|principal|director|head of/i.test(job.title) && !(profile.roles || '').toLowerCase().includes('senior') ? Math.round(state.weights.seniority * .55) : state.weights.seniority;
@@ -192,8 +199,8 @@ function allocateWeight(changedKey, requested) {
 }
 function renderJobs() {
   const target = $('#jobsList'); const assessed = recentJobs().map(job => ({ job, match: assess(job) })); const excluded = assessed.filter(item => !item.match.hardPass); const jobs = assessed.filter(item => item.match.hardPass).sort((a,b) => b.match.score - a.match.score);
-  $('#jobCount').textContent = jobs.length ? `${jobs.length} eligible roles${excluded.length ? ` · ${excluded.length} excluded by hard filters` : ''}` : '';
-  if (!jobs.length) { target.innerHTML = '<div class="empty-state">No qualifying roles are available for this date window. Try a broader filter, run a search, or load illustrative demo jobs.</div>'; return; }
+  $('#jobCount').textContent = `${jobs.length} eligible roles${excluded.length ? ` · ${excluded.length} excluded by hard filters` : ''}`;
+  if (!jobs.length) { target.innerHTML = `<div class="empty-state"><strong>No roles passed your hard filters.</strong><p>ApplyGuard received ${assessed.length} recent product roles, but ${excluded.length} did not match your saved target role or location.</p><p class="small">Your current location requirement is <strong>${escapeHtml(state.profile.location || 'not set')}</strong>. Bengaluru and Bangalore are treated as the same place. Remote roles pass only if you add “Remote” to your location preference.</p>${excluded.length ? `<details><summary>Show the first ${Math.min(excluded.length, 5)} excluded roles and reasons</summary><div class="excluded-list">${excluded.slice(0,5).map(({job,match}) => `<p><strong>${escapeHtml(job.title)}</strong> · ${escapeHtml(job.location)}<br><span class="muted small">${escapeHtml(match.hardFailures.join(' '))}</span></p>`).join('')}</div></details>` : ''}</div>`; return; }
   target.innerHTML = jobs.map(({job,match}) => {
     const decision = state.decisions[job.id];
     return `<article class="job-card ${decision === 'approved' ? 'selected' : ''}"><div class="job-top"><div><div class="job-title">${escapeHtml(job.title)}</div><div class="job-company">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</div></div><div class="score-circle" style="--score:${match.score * 3.6}deg"><b>${match.score}</b></div></div><div class="job-meta"><span class="tag good">${escapeHtml(match.verdict)}</span><span class="tag">${escapeHtml(job.source)}</span><span class="tag">${formatDate(job.postedAt)}</span></div><div class="match-reason"><p><strong>Why it may fit:</strong> ${match.signalHits.length ? escapeHtml(match.signalHits.join(' · ')) : 'Role/title alignment only; validate skills.'}</p><p><strong>Verified evidence:</strong> ${match.evidenceHits.length ? escapeHtml(match.evidenceHits.map(x=>x.title).join(' · ')) : 'No direct keyword evidence was found—review before using a claim.'}</p>${match.gaps.length ? `<p><strong>Gaps to review:</strong> ${escapeHtml(match.gaps.join(' '))}</p>` : ''}</div><div class="job-actions"><button class="secondary" data-open="${escapeHtml(job.id)}">View role ↗</button><button class="secondary" data-decision="reject" data-job="${escapeHtml(job.id)}">${decision === 'rejected' ? 'Rejected' : 'Reject'}</button><button class="primary" data-decision="approve" data-job="${escapeHtml(job.id)}">${decision === 'approved' ? 'Approved — view packet' : 'Approve & create packet'}</button></div></article>`;
