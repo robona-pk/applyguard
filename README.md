@@ -1,17 +1,18 @@
 # ApplyGuard
 
-> A local-first, supervised job-search copilot for product managers.
+> A supervised PM job-search workspace built around the job boards you already trust.
 
-ApplyGuard turns a resume into an editable evidence ledger, finds recent product jobs from public feeds, ranks them transparently, and prepares a reviewed application packet. It assists the candidate; it does not impersonate them.
+ApplyGuard turns a resume into an editable evidence ledger, imports opted-in job-alert emails from LinkedIn, Naukri, IIMJobs, and Instahyre, ranks them transparently, and prepares a reviewed application packet. It assists the candidate; it does not impersonate them.
 
 ## What works now
 
-The shipped static app has no backend, account, database, or API key.
+The browser profile and decisions remain local. A small Vercel backend is used only when the candidate explicitly connects Google to import job-alert emails.
 
 - Paste a resume or load a TXT, Markdown, PDF, or DOCX file; parsing occurs in the browser and the resulting text/profile stay in `localStorage` in the current browser.
 - Analyze the text locally to suggest product skills, relevant industries, target roles, and achievement-shaped evidence candidates.
 - Review, edit, and save an evidence ledger. Saved evidence is the only candidate material used in job-match explanations.
-- Run an on-demand search against permitted public job feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, Hopin's India feed, and Startup Jobs. When Bengaluru/Bangalore is your saved location, Hopin is queried with its exact Bangalore location filter. Source failures are visible and do not prevent other sources from returning results.
+- Import Gmail messages carrying the `applyguard-jobs` label. The importer reads only those messages, extracts LinkedIn, Naukri, IIMJobs, and Instahyre role links, de-duplicates them, and keeps the original platform URL. It never reads mail outside that label.
+- Optionally run an on-demand search against permitted public feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, Hopin's India feed, and Startup Jobs. These are supplementary, not the primary India PM search source.
 - Optionally connect Jobvetta's India job index through a Vercel Function. Its free API key is read only on the server, never exposed to the browser.
 - Filter recent jobs, deduplicate them, and rank PM roles with visible, adjustable deterministic weights.
 - See supporting skill signals, evidence items, gaps, and an explicitly non-predictive recommendation for every role.
@@ -22,26 +23,31 @@ The shipped static app has no backend, account, database, or API key.
 ## Workflow
 
 ```text
-Resume text (browser local storage)
-  → editable verified evidence ledger
-  → public job-feed query, normalization and deduplication
+LinkedIn / Naukri / IIMJobs / Instahyre job alerts
+  → Gmail label `applyguard-jobs`
+  → candidate-authorized, read-only import
+  → source-link extraction and de-duplication
+  → hard eligibility gates
   → transparent role/evidence/gap assessment
   → candidate approves or rejects a role
   → reviewable application packet
   → official job page opens in a new tab
-  → candidate completes and submits the application themselves
+
+Resume text (browser local storage)
+  → editable verified evidence ledger
+  → supports only the assessment and packet steps above
 ```
 
 ## Intentional boundaries
 
-This is a browser-only MVP. That has material limits:
+This is a local-first MVP. That has material limits:
 
-- It cannot run a scheduled daily search while the browser is closed.
+- It does not yet run unattended daily imports. A scheduled private-mail inbox requires encrypted refresh-token storage, an account model, and a privacy policy; this implementation deliberately avoids storing refresh tokens.
 - It only uses public feeds that the browser can access; source availability and CORS policy can change.
-- It does not scrape LinkedIn, Naukri, Indeed, or other protected boards. Reliable Bangalore-wide coverage across those sources requires a licensed aggregation provider and a small server-side integration to keep its key private.
+- It does not scrape LinkedIn, Naukri, IIMJobs, Instahyre, Indeed, or other protected boards. Their source-native job alerts are the primary ingestion route.
 - PDF and DOCX parsing downloads an open-source parser library at runtime. The file contents stay in the browser; if the parser cannot load, paste extracted text instead.
 - `localStorage` is not encrypted and is scoped to this browser/device. Do not use a shared browser profile for sensitive application data.
-- The app never stores credentials, logs into job boards, uploads files, sends messages, or submits applications.
+- The app never stores passwords, Gmail refresh tokens, job-board credentials, uploads files to job boards, sends messages, or submits applications. Google access is `gmail.readonly`, is limited by the Gmail label query, and is kept only for the active browser session.
 
 ## Ranking model
 
@@ -56,6 +62,18 @@ Every role receives a 0–100 prioritization score, not a prediction of whether 
 | Location | 10 | Match with explicit location/remote preference |
 
 The slider weights are local, inspectable, and adjustable. The interface always shows evidence used and gaps that need human review.
+
+## Connect Gmail alert import in Vercel
+
+This feature requires a Google Cloud OAuth client because Gmail does not expose a public inbox API without candidate authorization.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a **Web application** OAuth client and enable the Gmail API.
+2. Add `https://applyguard.vercel.app` (or your actual production domain) as an authorized JavaScript origin.
+3. Add `https://applyguard.vercel.app/api/google/callback` as an authorized redirect URI. Google requires an exact HTTPS redirect-URI match.
+4. In Vercel **Settings → Environment Variables**, add production values for `APP_ORIGIN`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`.
+5. Redeploy, create a Gmail label named `applyguard-jobs`, and use Gmail filters to apply it to the four platforms’ job-alert emails.
+
+The consent screen should request **View your email messages and settings** only. ApplyGuard does not retain the refresh token returned by Google, so reconnection is required after the short-lived session expires.
 
 ## Run locally
 
