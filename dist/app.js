@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'applyguard.v2';
+const MAX_STORED_JOBS = 200;
 const NOW = () => new Date().toISOString();
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 const $ = (selector) => document.querySelector(selector);
@@ -11,6 +12,7 @@ const DEFAULT_STATE = {
   sourceRuns: []
 };
 let state = load();
+state.jobs = compactJobs(state.jobs || []);
 
 function load() {
   try { return { ...structuredClone(DEFAULT_STATE), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
@@ -18,7 +20,9 @@ function load() {
 }
 function persist(event, detail = '') {
   if (event) state.audit.unshift({ at: NOW(), event, detail });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  state.audit = state.audit.slice(0, 100);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; }
+  catch (error) { console.error('ApplyGuard could not save local data:', error); return false; }
 }
 function escapeHtml(value = '') { return String(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c])); }
 function tokens(value = '') { return value.toLowerCase().replace(/[^a-z0-9+#/ ]/g, ' ').split(/\s+/).filter(x => x.length > 2); }
@@ -27,6 +31,10 @@ function setStatus(id, message, bad = false) { const el = $(id); el.textContent 
 function containsSignal(text, term) {
   if (term === 'ai' || term === 'ml') return new RegExp(`\\b${term}\\b`, 'i').test(text);
   return text.includes(term);
+}
+function compactJobs(jobs) {
+  return [...jobs].sort((a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt)).slice(0, MAX_STORED_JOBS)
+    .map(job => ({ ...job, description: String(job.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500) }));
 }
 
 const SIGNALS = {
@@ -118,7 +126,7 @@ function saveProfile() {
 
 function normalizeJob(raw, source) {
   const date = raw.date || raw.publication_date || raw.created_at || raw.createdAt || NOW();
-  return { id: `${source}:${raw.id || raw.url || raw.jobUrl || raw.title}`, source, title: raw.title || raw.position || 'Untitled Product role', company: raw.company_name || raw.company || raw.companyName || 'Unknown company', location: raw.candidate_required_location || raw.location || 'Not specified', url: raw.url || raw.jobUrl || raw.redirect_url || '', description: raw.description || raw.job_description || raw.snippet || '', postedAt: date, tags: raw.tags || raw.category || [] };
+  return { id: `${source}:${raw.id || raw.url || raw.jobUrl || raw.title}`, source, title: raw.title || raw.position || 'Untitled Product role', company: raw.company_name || raw.company || raw.companyName || 'Unknown company', location: raw.candidate_required_location || raw.location || 'Not specified', url: raw.url || raw.jobUrl || raw.redirect_url || '', description: String(raw.description || raw.job_description || raw.snippet || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500), postedAt: date, tags: raw.tags || raw.category || [] };
 }
 
 async function runSearch() {
@@ -137,7 +145,7 @@ async function runSearch() {
     }));
     const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: 'Unavailable in this browser right now' });
     const jobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.jobs).filter(isProductJob);
-    state.jobs = dedupeJobs(jobs); state.sourceRuns = runs; state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} deduplicated product roles from public feeds`);
+    state.jobs = compactJobs(dedupeJobs(jobs)); state.sourceRuns = runs; state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} stored product roles from public feeds`);
     renderSources(); renderJobs(); setStatus('#searchStatus', `Search complete: ${state.jobs.length} product roles found before your date filter.`);
   } catch (error) { setStatus('#searchStatus', `Search could not finish: ${error.message}`, true); }
   finally { $('#runSearch').disabled = false; $('#runSearch').textContent = 'Run today’s search'; }
@@ -156,7 +164,7 @@ function assess(job) {
   const skills = Math.min(state.weights.skills, Math.round((signalHits.length / Math.max(profile.signals?.length || 1, 3)) * state.weights.skills) + Math.min(10, evidenceHits.length * 4));
   const role = roleHit ? state.weights.role : Math.round(state.weights.role * .35); const industry = industryHit ? state.weights.industry : Math.round(state.weights.industry * .45);
   const seniority = /senior|lead|principal|director|head of/i.test(job.title) && !(profile.roles || '').toLowerCase().includes('senior') ? Math.round(state.weights.seniority * .55) : state.weights.seniority;
-  const loc = locationHit ? state.weights.location : Math.round(state.weights.location * .5);
+  const loc = !location ? Math.round(state.weights.location * .5) : locationHit ? state.weights.location : 0;
   const score = Math.min(100, skills + role + industry + seniority + loc);
   const gaps = [];
   if (!signalHits.length) gaps.push('No explicit skill signal overlap was found in the verified profile.');
@@ -168,7 +176,15 @@ function assess(job) {
 }
 
 function renderSources() { const target = $('#sourceStatus'); const sourceRuns = state.sourceRuns.length ? state.sourceRuns : [{name:'Remotive',status:'warn',message:'Run a search to query'},{name:'Arbeitnow',status:'warn',message:'Run a search to query'},{name:'Remote OK',status:'warn',message:'Run a search to query'}]; target.innerHTML = sourceRuns.map(s => `<div class="source ${s.status}"><strong>${s.status === 'ok' ? '●' : '○'} ${escapeHtml(s.name)}</strong><span>${escapeHtml(s.message)}</span></div>`).join(''); $('#lastRun').textContent = state.lastRun ? `Last run: ${new Date(state.lastRun).toLocaleString()}` : 'No search run yet'; }
-function renderWeights() { $('#weights').innerHTML = Object.entries(state.weights).map(([key, value]) => `<div class="weight"><label>${key[0].toUpperCase()+key.slice(1)} <span>${value}%</span><input type="range" min="0" max="60" value="${value}" data-weight="${key}"></label></div>`).join(''); }
+function renderWeights() { const total = Object.values(state.weights).reduce((sum, value) => sum + value, 0); $('#weights').innerHTML = `<p class="small muted">${total}% allocated. Setting one factor to 100% sets all others to 0%.</p>` + Object.entries(state.weights).map(([key, value]) => `<div class="weight"><label>${key[0].toUpperCase()+key.slice(1)} <span>${value}%</span><input type="range" min="0" max="100" value="${value}" data-weight="${key}"></label></div>`).join(''); }
+function allocateWeight(changedKey, requested) {
+  const keys = Object.keys(state.weights); const next = Math.max(0, Math.min(100, requested)); const others = keys.filter(key => key !== changedKey);
+  if (next === 100) { others.forEach(key => { state.weights[key] = 0; }); state.weights[changedKey] = 100; return; }
+  const remaining = 100 - next; const previousTotal = others.reduce((sum, key) => sum + state.weights[key], 0);
+  let assigned = 0;
+  others.forEach((key, index) => { const value = index === others.length - 1 ? remaining - assigned : Math.round((previousTotal ? state.weights[key] / previousTotal : 1 / others.length) * remaining); state.weights[key] = value; assigned += value; });
+  state.weights[changedKey] = next;
+}
 function renderJobs() {
   const target = $('#jobsList'); const jobs = recentJobs().map(job => ({ job, match: assess(job) })).sort((a,b) => b.match.score - a.match.score);
   $('#jobCount').textContent = jobs.length ? `${jobs.length} recent product roles` : '';
@@ -215,7 +231,7 @@ function bind() {
   $('#addEvidence').addEventListener('click', () => { state.profile.evidence.push({id:uid(),title:'Candidate-provided evidence',text:'Edit this evidence item to add a verified achievement, responsibility, or skill.',verified:false}); renderProfile(); });
   $('#evidenceList').addEventListener('click', e => { const id = e.target.dataset.deleteEvidence; if (id) { state.profile.evidence = state.profile.evidence.filter(x=>x.id!==id); renderProfile(); } });
   $('#saveProfile').addEventListener('click', saveProfile); $('#runSearch').addEventListener('click', runSearch); $('#dateFilter').addEventListener('change', renderJobs);
-  $('#weights').addEventListener('input', e => { const key=e.target.dataset.weight; if (key) { state.weights[key]=Number(e.target.value); persist(); renderWeights(); renderJobs(); } });
+  $('#weights').addEventListener('input', e => { const key=e.target.dataset.weight; if (key) { allocateWeight(key, Number(e.target.value)); persist(); renderWeights(); renderJobs(); } });
   $('#resetDemo').addEventListener('click', () => { state.jobs = structuredClone(DEMO_JOBS); state.sourceRuns = [{name:'Illustrative demo',status:'ok',message:'3 sample roles loaded'},{name:'Public sources',status:'warn',message:'Use Run today’s search for live feeds'}]; state.lastRun = NOW(); persist('Illustrative jobs loaded', 'Demo data only'); renderSources(); renderJobs(); });
   $('#jobsList').addEventListener('click', e => { const button = e.target instanceof Element ? e.target.closest('button') : null; if (!button) return; const id = button.dataset.job; if (id && button.dataset.decision) decide(id, button.dataset.decision); const open = button.dataset.open; if (open) { const job=state.jobs.find(x=>x.id===open); if(job?.url) window.open(job.url, '_blank', 'noopener'); } });
   $('#savePacket').addEventListener('click', savePacket); $('#openJob').addEventListener('click', () => { const job=state.jobs.find(x=>x.id===state.packet?.jobId); if(job?.url) { savePacket(); persist('Official job page opened', job.title); window.open(job.url, '_blank', 'noopener'); renderPacket(); } });
