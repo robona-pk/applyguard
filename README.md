@@ -11,7 +11,7 @@ The shipped static app has no backend, account, database, or API key.
 - Paste a resume or load a TXT, Markdown, PDF, or DOCX file; parsing occurs in the browser and the resulting text/profile stay in `localStorage` in the current browser.
 - Analyze the text locally to suggest product skills, relevant industries, target roles, and achievement-shaped evidence candidates.
 - Review, edit, and save an evidence ledger. Saved evidence is the only candidate material used in job-match explanations.
-- Run an on-demand search against permitted public job feeds (Remotive, Arbeitnow, and Remote OK). Source failures are visible and do not prevent other sources from returning results.
+- Run an on-demand search against permitted public job feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, and Hopin's India feed. When Bengaluru/Bangalore is your saved location, Hopin is queried with its exact Bangalore location filter. Source failures are visible and do not prevent other sources from returning results.
 - Filter recent jobs, deduplicate them, and rank PM roles with visible, adjustable deterministic weights.
 - See supporting skill signals, evidence items, gaps, and an explicitly non-predictive recommendation for every role.
 - Approve/reject a job locally. Approval creates an editable application packet with a missing-information checklist.
@@ -37,6 +37,7 @@ This is a browser-only MVP. That has material limits:
 
 - It cannot run a scheduled daily search while the browser is closed.
 - It only uses public feeds that the browser can access; source availability and CORS policy can change.
+- It does not scrape LinkedIn, Naukri, Indeed, or other protected boards. Reliable Bangalore-wide coverage across those sources requires a licensed aggregation provider and a small server-side integration to keep its key private.
 - PDF and DOCX parsing downloads an open-source parser library at runtime. The file contents stay in the browser; if the parser cannot load, paste extracted text instead.
 - `localStorage` is not encrypted and is scoped to this browser/device. Do not use a shared browser profile for sensitive application data.
 - The app never stores credentials, logs into job boards, uploads files, sends messages, or submits applications.
