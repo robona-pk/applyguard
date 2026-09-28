@@ -24,6 +24,10 @@ function escapeHtml(value = '') { return String(value).replace(/[&<>'"]/g, c => 
 function tokens(value = '') { return value.toLowerCase().replace(/[^a-z0-9+#/ ]/g, ' ').split(/\s+/).filter(x => x.length > 2); }
 function unique(values) { return [...new Set(values.filter(Boolean))]; }
 function setStatus(id, message, bad = false) { const el = $(id); el.textContent = message; el.style.color = bad ? 'var(--red)' : ''; }
+function containsSignal(text, term) {
+  if (term === 'ai' || term === 'ml') return new RegExp(`\\b${term}\\b`, 'i').test(text);
+  return text.includes(term);
+}
 
 const SIGNALS = {
   'Product strategy': ['product strategy', 'roadmap', 'product vision', 'priorit'],
@@ -47,11 +51,11 @@ const INDUSTRIES = {
 
 function inferProfile(text) {
   const lower = text.toLowerCase();
-  const signals = Object.entries(SIGNALS).filter(([, terms]) => terms.some(t => lower.includes(t))).map(([name]) => name);
-  const industries = Object.entries(INDUSTRIES).filter(([, terms]) => terms.some(t => lower.includes(t))).map(([name]) => name);
+  const signals = Object.entries(SIGNALS).filter(([, terms]) => terms.some(t => containsSignal(lower, t))).map(([name]) => name);
+  const industries = Object.entries(INDUSTRIES).filter(([, terms]) => terms.some(t => containsSignal(lower, t))).map(([name]) => name);
   const roles = unique([
     lower.includes('growth') ? 'Growth Product Manager' : '',
-    lower.includes('ai') || lower.includes('ml') || lower.includes('llm') ? 'AI Product Manager' : '',
+    containsSignal(lower, 'ai') || containsSignal(lower, 'ml') || lower.includes('llm') ? 'AI Product Manager' : '',
     lower.includes('platform') || lower.includes('api') ? 'Platform Product Manager' : '',
     'Product Manager'
   ]);
@@ -100,12 +104,14 @@ function renderProfile() {
   $('#targetIndustries').textContent = p.industries || 'Add target industries';
   $('#rolesInput').value = p.roles || ''; $('#industriesInput').value = p.industries || '';
   $('#locationInput').value = p.location || ''; $('#authorizationInput').value = p.authorization || '';
+  $('#signalsList').innerHTML = (p.signals || []).map(signal => `<label><input type="checkbox" data-signal="${escapeHtml(signal)}" checked> ${escapeHtml(signal)}</label>`).join('') || '<span class="muted small">No strong signals were inferred. Add evidence manually if useful.</span>';
   $('#evidenceList').innerHTML = p.evidence.map(item => `<div class="evidence-item"><div><label>Evidence label ${item.verified ? '<span class="tag good">Verified</span>' : '<span class="tag gap">Review needed</span>'}<input data-evidence-title="${item.id}" value="${escapeHtml(item.title)}"></label><label class="small">Candidate-provided fact or achievement<textarea rows="3" data-evidence-text="${item.id}">${escapeHtml(item.text)}</textarea></label></div><button class="icon-button" data-delete-evidence="${item.id}" aria-label="Remove evidence">Remove</button></div>`).join('') || '<p class="muted">Add one or more evidence items before ranking jobs.</p>';
 }
 
 function saveProfile() {
   state.profile.roles = $('#rolesInput').value.trim(); state.profile.industries = $('#industriesInput').value.trim();
   state.profile.location = $('#locationInput').value.trim(); state.profile.authorization = $('#authorizationInput').value.trim();
+  state.profile.signals = [...document.querySelectorAll('[data-signal]:checked')].map(input => input.dataset.signal);
   state.profile.evidence = state.profile.evidence.map(x => ({ ...x, title: $(`[data-evidence-title="${x.id}"]`)?.value.trim() || x.title, text: $(`[data-evidence-text="${x.id}"]`)?.value.trim() || x.text, verified: true })).filter(x => x.text);
   persist('Profile saved', 'Candidate reviewed profile and evidence ledger'); renderProfile(); renderJobs(); setStatus('#profileStatus', 'Profile saved. All current evidence is now marked verified.');
 }
@@ -117,21 +123,24 @@ function normalizeJob(raw, source) {
 
 async function runSearch() {
   if (!state.profile.evidence?.length) { alert('Build and save your evidence ledger before running a search.'); location.hash = '#profile'; return; }
-  $('#runSearch').disabled = true; $('#runSearch').textContent = 'Searching public feeds…';
+  $('#runSearch').disabled = true; $('#runSearch').textContent = 'Searching public feeds…'; setStatus('#searchStatus', 'Checking public job sources…');
   const sources = [
     { name: 'Remotive', url: 'https://remotive.com/api/remote-jobs?category=product', parse: x => x.jobs || [] },
     { name: 'Arbeitnow', url: 'https://www.arbeitnow.com/api/job-board-api', parse: x => x.data || [] },
     { name: 'Remote OK', url: 'https://remoteok.com/api', parse: x => Array.isArray(x) ? x.slice(1) : [] }
   ];
-  const results = await Promise.allSettled(sources.map(async s => {
-    const response = await fetch(s.url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json(); return { name: s.name, jobs: s.parse(data).map(x => normalizeJob(x, s.name)) };
-  }));
-  const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: 'Unavailable in this browser right now' });
-  const jobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.jobs).filter(isProductJob);
-  state.jobs = dedupeJobs(jobs); state.sourceRuns = runs; state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} deduplicated product roles from public feeds`);
-  renderSources(); renderJobs(); $('#runSearch').disabled = false; $('#runSearch').textContent = 'Run today’s search';
+  try {
+    const results = await Promise.allSettled(sources.map(async s => {
+      const response = await fetch(s.url, { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json(); return { name: s.name, jobs: s.parse(data).map(x => normalizeJob(x, s.name)) };
+    }));
+    const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: 'Unavailable in this browser right now' });
+    const jobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.jobs).filter(isProductJob);
+    state.jobs = dedupeJobs(jobs); state.sourceRuns = runs; state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} deduplicated product roles from public feeds`);
+    renderSources(); renderJobs(); setStatus('#searchStatus', `Search complete: ${state.jobs.length} product roles found before your date filter.`);
+  } catch (error) { setStatus('#searchStatus', `Search could not finish: ${error.message}`, true); }
+  finally { $('#runSearch').disabled = false; $('#runSearch').textContent = 'Run today’s search'; }
 }
 function isProductJob(job) { return /product manager|product owner|product lead|product analyst|product director|growth product/i.test(`${job.title} ${job.description}`); }
 function dedupeJobs(jobs) { const seen = new Set(); return jobs.filter(job => { const key = `${job.company}|${job.title}|${job.location}`.toLowerCase().replace(/\s+/g,' '); if (seen.has(key)) return false; seen.add(key); return true; }); }
@@ -173,7 +182,8 @@ function formatDate(date) { const d = new Date(date); return Number.isNaN(d) ? '
 
 function decide(jobId, decision) {
   state.decisions[jobId] = decision; const job = state.jobs.find(x => x.id === jobId);
-  if (decision === 'approved' && job) { state.packet = { jobId, summary: makeSummary(job), answers: {}, savedAt: null }; persist('Job approved', `${job.title} at ${job.company}`); renderPacket(); location.hash = '#packet'; }
+  if (!job) { setStatus('#searchStatus', 'That role is no longer available in the current result set. Run the search again.', true); return; }
+  if (decision === 'approved') { state.packet = { jobId, summary: makeSummary(job), answers: {}, savedAt: null }; persist('Job approved', `${job.title} at ${job.company}`); renderPacket(); renderJobs(); location.hash = '#packet'; }
   else persist('Job rejected', job?.title || 'Job'); renderJobs();
 }
 function makeSummary(job) { const assessment = assess(job); const evidence = assessment.evidenceHits; const support = evidence.length ? evidence.map(x=>x.text).join(' ') : 'My verified profile contains relevant product-management experience.'; return `I am interested in the ${job.title} role because it aligns with my verified experience in ${assessment.signalHits.join(', ') || 'product management'}. ${support} I would be transparent about any domain-specific gaps identified in the review.`; }
@@ -207,7 +217,7 @@ function bind() {
   $('#saveProfile').addEventListener('click', saveProfile); $('#runSearch').addEventListener('click', runSearch); $('#dateFilter').addEventListener('change', renderJobs);
   $('#weights').addEventListener('input', e => { const key=e.target.dataset.weight; if (key) { state.weights[key]=Number(e.target.value); persist(); renderWeights(); renderJobs(); } });
   $('#resetDemo').addEventListener('click', () => { state.jobs = structuredClone(DEMO_JOBS); state.sourceRuns = [{name:'Illustrative demo',status:'ok',message:'3 sample roles loaded'},{name:'Public sources',status:'warn',message:'Use Run today’s search for live feeds'}]; state.lastRun = NOW(); persist('Illustrative jobs loaded', 'Demo data only'); renderSources(); renderJobs(); });
-  $('#jobsList').addEventListener('click', e => { const id = e.target.dataset.job; if (id) decide(id, e.target.dataset.decision); const open = e.target.dataset.open; if (open) { const job=state.jobs.find(x=>x.id===open); if(job?.url) window.open(job.url, '_blank', 'noopener'); } });
+  $('#jobsList').addEventListener('click', e => { const button = e.target instanceof Element ? e.target.closest('button') : null; if (!button) return; const id = button.dataset.job; if (id && button.dataset.decision) decide(id, button.dataset.decision); const open = button.dataset.open; if (open) { const job=state.jobs.find(x=>x.id===open); if(job?.url) window.open(job.url, '_blank', 'noopener'); } });
   $('#savePacket').addEventListener('click', savePacket); $('#openJob').addEventListener('click', () => { const job=state.jobs.find(x=>x.id===state.packet?.jobId); if(job?.url) { savePacket(); persist('Official job page opened', job.title); window.open(job.url, '_blank', 'noopener'); renderPacket(); } });
   $('#exportData').addEventListener('click', () => { const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;a.download='applyguard-local-data.json';a.click();URL.revokeObjectURL(url); });
   $('#deleteData').addEventListener('click', () => { if(confirm('Delete your resume text, profile, job decisions, packets, and audit history from this browser? This cannot be undone.')) { localStorage.removeItem(STORAGE_KEY); state=structuredClone(DEFAULT_STATE); location.reload(); } });
