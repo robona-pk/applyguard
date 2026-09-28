@@ -152,10 +152,21 @@ async function runSearch() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json(); return { name: s.name, jobs: s.parse(data).map(x => normalizeJob(x, s.name)) };
     }));
+    const successful = results.filter(r => r.status === 'fulfilled');
     const runs = results.map((r, i) => r.status === 'fulfilled' ? { name: sources[i].name, status: 'ok', count: r.value.jobs.length, message: `${r.value.jobs.length} roles received` } : { name: sources[i].name, status: 'warn', count: 0, message: 'Unavailable in this browser right now' });
-    const jobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.jobs).filter(isProductJob);
-    state.jobs = compactJobs(dedupeJobs(jobs)); state.sourceRuns = runs; state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} stored product roles from public feeds`);
-    renderSources(); renderJobs(); setStatus('#searchStatus', `Search complete: ${state.jobs.length} product roles found before your date filter.`);
+    const jobs = successful.flatMap(r => r.value.jobs).filter(isProductJob);
+    state.sourceRuns = runs;
+    if (jobs.length) {
+      state.jobs = compactJobs(dedupeJobs(jobs)); state.lastRun = NOW(); persist('Job search run', `${state.jobs.length} stored product roles from public feeds`);
+      setStatus('#searchStatus', `Search complete: ${state.jobs.length} product roles found before your date filter.`);
+    } else if (state.jobs.length) {
+      persist('Job search refresh retained previous results', successful.length ? 'Sources returned no product roles' : 'All sources were unavailable');
+      setStatus('#searchStatus', `No fresh product roles were returned. Showing ${state.jobs.length} roles from the last successful search instead.`, true);
+    } else {
+      persist('Job search returned no jobs', successful.length ? 'Sources returned no product roles' : 'All sources were unavailable');
+      setStatus('#searchStatus', 'No product roles were returned. Check the source status cards below and try again later.', true);
+    }
+    renderSources(); renderJobs();
   } catch (error) { setStatus('#searchStatus', `Search could not finish: ${error.message}`, true); }
   finally { $('#runSearch').disabled = false; $('#runSearch').textContent = 'Run today’s search'; }
 }
