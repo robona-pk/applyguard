@@ -1,70 +1,80 @@
 # ApplyGuard
 
-> A supervised job-application copilot that turns a job description into an evidence-based approval packet.
+> A local-first, supervised job-search copilot for product managers.
 
-## Why this exists
+ApplyGuard turns a resume into an editable evidence ledger, finds recent product jobs from public feeds, ranks them transparently, and prepares a reviewed application packet. It assists the candidate; it does not impersonate them.
 
-Job seekers increasingly need help tailoring applications, but an auto-apply agent can easily invent claims, disclose the wrong information, or submit the wrong application. ApplyGuard is a product prototype for the safer alternative: an agent that does the analysis and drafting, while the candidate approves every external action.
+## What works now
 
-The demo uses a Search & Conversational Discovery Product Manager job description and illustrative candidate evidence from a consumer product-management background.
+The shipped static app has no backend, account, database, or API key.
 
-## Product flow
+- Paste a resume or load a TXT, Markdown, PDF, or DOCX file; parsing occurs in the browser and the resulting text/profile stay in `localStorage` in the current browser.
+- Analyze the text locally to suggest product skills, relevant industries, target roles, and achievement-shaped evidence candidates.
+- Review, edit, and save an evidence ledger. Saved evidence is the only candidate material used in job-match explanations.
+- Run an on-demand search against permitted public job feeds (Remotive, Arbeitnow, and Remote OK). Source failures are visible and do not prevent other sources from returning results.
+- Filter recent jobs, deduplicate them, and rank PM roles with visible, adjustable deterministic weights.
+- See supporting skill signals, evidence items, gaps, and an explicitly non-predictive recommendation for every role.
+- Approve/reject a job locally. Approval creates an editable application packet with a missing-information checklist.
+- Open the official job URL only after an approved packet is reviewed; the app never pre-fills or submits a third-party form.
+- Export or permanently delete all local data.
+
+## Workflow
 
 ```text
-Job description
-  → requirement extraction
-  → evidence ledger + fit assessment
-  → approval packet (resume, answers, disclosure flags)
-  → candidate approval
-  → supervised browser handoff
-  → submission receipt + audit log
+Resume text (browser local storage)
+  → editable verified evidence ledger
+  → public job-feed query, normalization and deduplication
+  → transparent role/evidence/gap assessment
+  → candidate approves or rejects a role
+  → reviewable application packet
+  → official job page opens in a new tab
+  → candidate completes and submits the application themselves
 ```
 
-## What the prototype demonstrates
+## Intentional boundaries
 
-- JD parsing into role signals: experimentation, discovery, AI/ML, consumer product and cross-functional delivery.
-- Explainable fit scoring. A score is a prioritisation aid, not a hiring prediction.
-- Evidence-grounded answer drafting, with explicit gaps rather than invented experience.
-- A human approval state and audit trail.
-- A hard product guardrail: the demo cannot log in, upload files, send messages, or submit applications.
+This is a browser-only MVP. That has material limits:
+
+- It cannot run a scheduled daily search while the browser is closed.
+- It only uses public feeds that the browser can access; source availability and CORS policy can change.
+- PDF and DOCX parsing downloads an open-source parser library at runtime. The file contents stay in the browser; if the parser cannot load, paste extracted text instead.
+- `localStorage` is not encrypted and is scoped to this browser/device. Do not use a shared browser profile for sensitive application data.
+- The app never stores credentials, logs into job boards, uploads files, sends messages, or submits applications.
+
+## Ranking model
+
+Every role receives a 0–100 prioritization score, not a prediction of whether the candidate will be hired.
+
+| Component | Default weight | Meaning |
+| --- | ---: | --- |
+| Skill signals | 45 | Overlap between resume-derived, verified skills and job language |
+| Role alignment | 20 | Alignment with target roles and product-management titles |
+| Industry alignment | 15 | Overlap with candidate-selected industries |
+| Seniority | 10 | A cautious adjustment for roles labelled senior/lead/director |
+| Location | 10 | Match with explicit location/remote preference |
+
+The slider weights are local, inspectable, and adjustable. The interface always shows evidence used and gaps that need human review.
 
 ## Run locally
 
-No dependencies are required. Open `dist/index.html` in a browser.
+No package installation is required. Open `dist/index.html` in a modern browser. For live source requests, serve the `dist` folder with any static server if your browser restricts network requests from `file://` pages.
 
-## Production architecture (next iteration)
+## Repository structure
 
-| Layer | Responsibility | Product guardrail |
-| --- | --- | --- |
-| Ingestion | Parse pasted JDs or user-approved job alerts | Treat JD text as untrusted input |
-| Candidate ledger | Store approved resume facts, preferences and answer policies | Never infer facts or work history |
-| LLM workflow | Extract requirements, draft grounded answers and identify gaps | Retrieve evidence before generation; require structured output |
-| Evaluation | Measure claim grounding, job-match precision and approval rate | Human review set plus regression tests |
-| Browser handoff | Prefill only after the candidate approves the packet | Separate confirmation immediately before submission |
-| Audit store | Record source JD, evidence, edits, approvals and application receipt | Encrypt personal data; minimise retention |
+```text
+dist/
+  index.html     # application markup and accessible workflow screens
+  styles.css     # responsive styles
+  app.js         # local state, resume analysis, sources, ranking, packets
+```
 
-## Metrics
+## Next milestones
 
-- **Candidate value:** qualified applications approved per week; time from JD to reviewable packet; interview rate by fit band.
-- **Quality:** unsupported-claim rate; human disagreement with fit rating; answer edit rate.
-- **Safety:** submissions without final confirmation (target: zero); sensitive fields sent without explicit approval (target: zero).
-- **Efficiency:** cost per approval packet; median time to first packet; browser handoff completion rate.
+1. Migrate structured local data from `localStorage` to IndexedDB for larger resume files and more robust client-side retention.
+2. Add a labeled evaluation set for fit accuracy, unsupported-claim prevention, and gap detection.
+3. Add a small serverless scheduled discovery service for a genuine daily run, with source consent and an explicit privacy policy.
+4. Add a user-authorized browser extension handoff that still requires visible per-site, final-submit confirmation.
 
-## Portfolio case-study framing
+## Privacy
 
-**Problem:** tailoring applications is repetitive and error-prone; fully autonomous applying trades time saved for trust and accuracy risk.
-
-**Product decision:** prioritise supervised automation. The agent can analyse and draft, but the candidate owns sensitive data, factual claims and the final submission.
-
-**Trade-off:** this is slower than indiscriminate auto-apply tools, but it is more defensible for high-stakes career decisions and creates an audit trail for evaluation.
-
-## Roadmap
-
-1. Replace keyword matching with a structured LLM extraction step and a candidate evidence retrieval layer.
-2. Add an evaluation set of 50 real job descriptions labelled for fit, missing facts and risky claims.
-3. Add a review queue with versioned answers and explicit approval prompts.
-4. Add user-authorised browser handoff for career pages and LinkedIn Easy Apply, retaining a final submit confirmation.
-
-## Privacy note
-
-Do not commit real resumes, email addresses, phone numbers, compensation, cookies, credentials, or job-application receipts to this repository. The shipped demo uses illustrative content only.
+Do not commit resumes, contact details, compensation information, cookies, credentials, or application receipts to this repository. The illustrative job data is synthetic.
