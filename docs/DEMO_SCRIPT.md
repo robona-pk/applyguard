@@ -1,10 +1,10 @@
-# ApplyGuard walkthrough script
+# FindAMatch walkthrough script
 
 Use only illustrative profile and job data in recordings. Do not record a real resume, email address, Gmail inbox, OAuth screen, API key, or application details.
 
 ## 90-second narrative
 
-1. **Frame the problem (0:00–0:10):** "ApplyGuard is a local-first job-search copilot for product managers. It helps a candidate decide where to spend effort; it does not apply on their behalf."
+1. **Frame the problem (0:00–0:10):** "FindAMatch is a local-first job-search copilot for product managers. It helps a candidate decide where to spend effort; it does not apply on their behalf."
 2. **Profile and evidence (0:10–0:30):** Paste an illustrative resume. Click **Analyze profile**, point out that the app generates hypotheses, then review and save the evidence ledger.
 3. **Hard filters (0:30–0:40):** Set target roles and Bengaluru/remote preference. Explain that role and location are gates, not ranking weights.
 4. **Discovery (0:40–0:55):** Show the Gmail label contract (`applyguard-jobs`) and supplementary open-feed search. Do not open a real inbox in the recording.

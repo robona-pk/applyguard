@@ -1,8 +1,8 @@
-# ApplyGuard
+# FindAMatch
 
 **A local-first, evidence-grounded job-search copilot for product managers.**
 
-ApplyGuard turns a candidate's resume into a reviewable profile, imports only the job-alert emails they explicitly label, applies hard eligibility filters, ranks the remaining roles with an inspectable model, and prepares an editable application packet. It is decision support—not an auto-apply bot.
+FindAMatch turns a candidate's resume into a reviewable profile, imports only the job-alert emails they explicitly label, applies hard eligibility filters, ranks the remaining roles with an inspectable model, and prepares an editable application packet. It is decision support—not an auto-apply bot.
 
 [Open the live app](https://applyguard.vercel.app) · [Watch the walkthrough](./docs/assets/applyguard-walkthrough.mov) · [Read the product case study](./docs/portfolio-case-study.md)
 
@@ -12,7 +12,7 @@ ApplyGuard turns a candidate's resume into a reviewable profile, imports only th
 
 Job search tools often make two unhelpful trade-offs: they either flood candidates with undifferentiated listings or promise autonomous applications that can make unsupported claims on their behalf. Product managers need a faster way to find opportunities **and** a trustworthy way to judge fit.
 
-ApplyGuard is designed around a smaller, more credible loop:
+FindAMatch is designed around a smaller, more credible loop:
 
 ```text
 Resume → editable evidence ledger → labeled job alerts → hard eligibility gates
@@ -45,7 +45,7 @@ The recorded walkthrough uses illustrative data only. See the [demo script](./do
 | Decision | Why it matters |
 | --- | --- |
 | `localStorage` by default | A portfolio MVP should not silently centralize resumes, job decisions, or application data. |
-| Gmail labels as the import boundary | The candidate chooses exactly which emails ApplyGuard may read; it never scans the full inbox. |
+| Gmail labels as the import boundary | The candidate chooses exactly which emails FindAMatch may read; it never scans the full inbox. |
 | Role + location as hard filters | Eligibility should not be diluted by a scoring model. Bengaluru and Bangalore are treated as the same location. |
 | Evidence ledger before explanations | The product cannot turn weak resume inference into a confident claim. |
 | No autofill or submit | A job application is representational and high stakes. The candidate reviews and submits on the employer's site. |

@@ -17,7 +17,7 @@ function page(message, payload = {}, targetOrigin = (process.env.APP_ORIGIN || '
   const headers = new Headers({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   headers.append('Set-Cookie', 'applyguard_oauth_state=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
   headers.append('Set-Cookie', 'applyguard_oauth_parent=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
-  return new Response(`<!doctype html><title>ApplyGuard</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify(targetOrigin)};try{localStorage.setItem('applyguard.googleAuthResult',JSON.stringify(result));setTimeout(()=>localStorage.removeItem('applyguard.googleAuthResult'),15000)}catch{}try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('applyguard-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),700)</script>`, { headers });
+  return new Response(`<!doctype html><title>FindAMatch</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify(targetOrigin)};try{localStorage.setItem('applyguard.googleAuthResult',JSON.stringify(result));setTimeout(()=>localStorage.removeItem('applyguard.googleAuthResult'),15000)}catch{}try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('applyguard-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),700)</script>`, { headers });
 }
 
 export default {
