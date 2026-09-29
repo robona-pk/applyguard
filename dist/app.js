@@ -166,6 +166,14 @@ function receiveGoogleConnection(data) {
   persist('Gmail alert inbox connected', 'Read-only access token kept only for this browser session');
   renderInbox(); setStatus('#gmailImportStatus', 'Google connected. You can now import emails labeled applyguard-jobs.');
 }
+function receiveStoredGoogleConnection() {
+  try {
+    const stored = localStorage.getItem('applyguard.googleAuthResult');
+    if (!stored) return;
+    localStorage.removeItem('applyguard.googleAuthResult');
+    receiveGoogleConnection(JSON.parse(stored));
+  } catch { localStorage.removeItem('applyguard.googleAuthResult'); }
+}
 function connectGmail() {
   const popup = window.open('/api/google/auth', 'applyguard-google-auth', 'width=520,height=680');
   if (!popup) { setStatus('#gmailImportStatus', 'Allow pop-ups for ApplyGuard, then connect Google again.', true); return; }
@@ -330,6 +338,11 @@ function init() {
     googleAuthChannel = new BroadcastChannel('applyguard-google-auth');
     googleAuthChannel.addEventListener('message', event => receiveGoogleConnection(event.data));
   }
+  window.addEventListener('storage', event => {
+    if (event.key !== 'applyguard.googleAuthResult' || !event.newValue) return;
+    receiveStoredGoogleConnection();
+  });
+  receiveStoredGoogleConnection();
   renderProfile(); renderInbox(); renderSources(); renderWeights(); renderJobs(); renderPacket(); bind();
 }
 init();

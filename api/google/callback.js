@@ -5,7 +5,7 @@ function cookie(request, name) {
 
 function page(message, payload = {}) {
   const data = JSON.stringify({ type: 'applyguard-google-auth', ...payload }).replace(/</g, '\\u003c');
-  return new Response(`<!doctype html><title>ApplyGuard</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify((process.env.APP_ORIGIN || '').replace(/\/$/, ''))};try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('applyguard-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),200)</script>`, {
+  return new Response(`<!doctype html><title>ApplyGuard</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify((process.env.APP_ORIGIN || '').replace(/\/$/, ''))};try{localStorage.setItem('applyguard.googleAuthResult',JSON.stringify(result));setTimeout(()=>localStorage.removeItem('applyguard.googleAuthResult'),15000)}catch{}try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('applyguard-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),700)</script>`, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Set-Cookie': 'applyguard_oauth_state=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0' }
   });
 }
