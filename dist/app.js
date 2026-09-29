@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'applyguard.v2';
 const MAX_STORED_JOBS = 200;
+const OAUTH_BRIDGE_ORIGIN = 'https://applyguard.vercel.app';
 const NOW = () => new Date().toISOString();
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 const $ = (selector) => document.querySelector(selector);
@@ -175,10 +176,10 @@ function receiveStoredGoogleConnection() {
   } catch { localStorage.removeItem('applyguard.googleAuthResult'); }
 }
 function connectGmail() {
-  const popup = window.open('/api/google/auth', 'applyguard-google-auth', 'width=520,height=680');
+  const popup = window.open(`${OAUTH_BRIDGE_ORIGIN}/api/google/auth?parent_origin=${encodeURIComponent(window.location.origin)}`, 'applyguard-google-auth', 'width=520,height=680');
   if (!popup) { setStatus('#gmailImportStatus', 'Allow pop-ups for ApplyGuard, then connect Google again.', true); return; }
   const receive = event => {
-    if (event.origin !== window.location.origin || event.data?.type !== 'applyguard-google-auth') return;
+    if (![window.location.origin, OAUTH_BRIDGE_ORIGIN].includes(event.origin) || event.data?.type !== 'applyguard-google-auth') return;
     window.removeEventListener('message', receive);
     receiveGoogleConnection(event.data);
   };
