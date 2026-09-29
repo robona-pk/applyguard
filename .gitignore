@@ -1,2 +1,6 @@
 .DS_Store
 .sites-runtime/
+.env
+.env.*
+!.env.example
+applyguard-local-data.json

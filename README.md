@@ -1,106 +1,135 @@
 # ApplyGuard
 
-> A supervised PM job-search workspace built around the job boards you already trust.
+**A local-first, evidence-grounded job-search copilot for product managers.**
 
-ApplyGuard turns a resume into an editable evidence ledger, imports opted-in job-alert emails from LinkedIn, Naukri, IIMJobs, and Instahyre, ranks them transparently, and prepares a reviewed application packet. It assists the candidate; it does not impersonate them.
+ApplyGuard turns a candidate's resume into a reviewable profile, imports only the job-alert emails they explicitly label, applies hard eligibility filters, ranks the remaining roles with an inspectable model, and prepares an editable application packet. It is decision support—not an auto-apply bot.
 
-## What works now
+[Open the live app](https://applyguard.vercel.app) · [Watch the walkthrough](./docs/assets/applyguard-walkthrough.mov) · [Read the product case study](./docs/portfolio-case-study.md)
 
-The browser profile and decisions remain local. A small Vercel backend is used only when the candidate explicitly connects Google to import job-alert emails.
+> **Portfolio build.** This project demonstrates product judgment as much as implementation: where automation is useful, where it is risky, and how to preserve a candidate's control over their own career data and applications.
 
-- Paste a resume or load a TXT, Markdown, PDF, or DOCX file; parsing occurs in the browser and the resulting text/profile stay in `localStorage` in the current browser.
-- Analyze the text locally to suggest product skills, relevant industries, target roles, and achievement-shaped evidence candidates.
-- Review, edit, and save an evidence ledger. Saved evidence is the only candidate material used in job-match explanations.
-- Import Gmail messages carrying the `applyguard-jobs` label. The importer reads only those messages, extracts LinkedIn, Naukri, IIMJobs, and Instahyre role links, de-duplicates them, and keeps the original platform URL. It never reads mail outside that label.
-- Optionally run an on-demand search against permitted public feeds: Remotive, Arbeitnow, Remote OK, Jobicy APAC, Himalayas India-eligible remote roles, Hopin's India feed, and Startup Jobs. These are supplementary, not the primary India PM search source.
-- Optionally connect Jobvetta's India job index through a Vercel Function. Its free API key is read only on the server, never exposed to the browser.
-- Filter recent jobs, deduplicate them, and rank PM roles with visible, adjustable deterministic weights.
-- See supporting skill signals, evidence items, gaps, and an explicitly non-predictive recommendation for every role.
-- Approve/reject a job locally. Approval creates an editable application packet with a missing-information checklist.
-- Open the official job URL only after an approved packet is reviewed; the app never pre-fills or submits a third-party form.
-- Export or permanently delete all local data.
+## The problem
 
-## Workflow
+Job search tools often make two unhelpful trade-offs: they either flood candidates with undifferentiated listings or promise autonomous applications that can make unsupported claims on their behalf. Product managers need a faster way to find opportunities **and** a trustworthy way to judge fit.
+
+ApplyGuard is designed around a smaller, more credible loop:
 
 ```text
-LinkedIn / Naukri / IIMJobs / Instahyre job alerts
-  → Gmail label `applyguard-jobs`
-  → candidate-authorized, read-only import
-  → source-link extraction and de-duplication
-  → hard eligibility gates
-  → transparent role/evidence/gap assessment
-  → candidate approves or rejects a role
-  → reviewable application packet
-  → official job page opens in a new tab
-
-Resume text (browser local storage)
-  → editable verified evidence ledger
-  → supports only the assessment and packet steps above
+Resume → editable evidence ledger → labeled job alerts → hard eligibility gates
+       → transparent ranking and gaps → candidate approval → reviewed handoff
 ```
 
-## Intentional boundaries
+## What it does
 
-This is a local-first MVP. That has material limits:
+- **Local resume analysis** — paste or load a TXT, PDF, or DOCX resume. Text, profile data, decisions, and packets remain in the browser's `localStorage`.
+- **Verified evidence ledger** — extracted achievements are hypotheses until the candidate reviews and saves them. Only verified evidence can support a recommendation or packet.
+- **Candidate-controlled Gmail import** — after explicit Google OAuth consent, the app reads only emails carrying the `applyguard-jobs` label and extracts original LinkedIn, Naukri, IIMJobs, and Instahyre links.
+- **Supplementary open-feed search** — an on-demand search checks permitted public feeds for extra startup and remote roles. It does not scrape protected job boards.
+- **Hard filters before ranking** — target role and location are eligibility gates. A role that fails either is shown as excluded, never promoted because it has matching keywords.
+- **Transparent soft-signal ranking** — skill signals, industry alignment, and seniority are adjustable local weights that always total 100%.
+- **Human-approved application packets** — approval creates a reviewed draft, surfaces missing information, and opens the official job URL only when the candidate chooses to continue.
 
-- It does not yet run unattended daily imports. A scheduled private-mail inbox requires encrypted refresh-token storage, an account model, and a privacy policy; this implementation deliberately avoids storing refresh tokens.
-- It only uses public feeds that the browser can access; source availability and CORS policy can change.
-- It does not scrape LinkedIn, Naukri, IIMJobs, Instahyre, Indeed, or other protected boards. Their source-native job alerts are the primary ingestion route.
-- PDF and DOCX parsing downloads an open-source parser library at runtime. The file contents stay in the browser; if the parser cannot load, paste extracted text instead.
-- `localStorage` is not encrypted and is scoped to this browser/device. Do not use a shared browser profile for sensitive application data.
-- The app never stores passwords, Gmail refresh tokens, job-board credentials, uploads files to job boards, sends messages, or submits applications. Google access is `gmail.readonly`, is limited by the Gmail label query, and is kept only for the active browser session.
+## Walkthrough
 
-## Ranking model
+1. Upload or paste a resume and review the suggested profile.
+2. Correct the inferred signals, add evidence, target roles, industries, and location; then save the verified profile.
+3. Create job alerts on preferred boards and apply the Gmail label `applyguard-jobs`.
+4. Connect Google with read-only access and import only those labeled alerts—or run the supplementary public-feed search.
+5. Review ranked eligible roles, fit signals, evidence, and gaps.
+6. Approve a role to create a packet, complete the checklist, and hand off to the official job page.
 
-Every role receives a 0–100 prioritization score, not a prediction of whether the candidate will be hired.
+The recorded walkthrough uses illustrative data only. See the [demo script](./docs/DEMO_SCRIPT.md) for the exact narrative.
 
-| Component | Default weight | Meaning |
-| --- | ---: | --- |
-| Skill signals | 45 | Overlap between resume-derived, verified skills and job language |
-| Role alignment | 20 | Alignment with target roles and product-management titles |
-| Industry alignment | 15 | Overlap with candidate-selected industries |
-| Seniority | 10 | A cautious adjustment for roles labelled senior/lead/director |
-| Location | 10 | Match with explicit location/remote preference |
+## Product decisions
 
-The slider weights are local, inspectable, and adjustable. The interface always shows evidence used and gaps that need human review.
+| Decision | Why it matters |
+| --- | --- |
+| `localStorage` by default | A portfolio MVP should not silently centralize resumes, job decisions, or application data. |
+| Gmail labels as the import boundary | The candidate chooses exactly which emails ApplyGuard may read; it never scans the full inbox. |
+| Role + location as hard filters | Eligibility should not be diluted by a scoring model. Bengaluru and Bangalore are treated as the same location. |
+| Evidence ledger before explanations | The product cannot turn weak resume inference into a confident claim. |
+| No autofill or submit | A job application is representational and high stakes. The candidate reviews and submits on the employer's site. |
 
-## Connect Gmail alert import in Vercel
+## Architecture
 
-This feature requires a Google Cloud OAuth client because Gmail does not expose a public inbox API without candidate authorization.
+```text
+Browser (static app)
+├── Resume parsing + profile inference
+├── Local state / evidence / decisions / packets
+├── Deterministic hard filters and fit scoring
+└── Public-source discovery requests
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a **Web application** OAuth client and enable the Gmail API.
-2. Add `https://applyguard.vercel.app` (or your actual production domain) as an authorized JavaScript origin.
-3. Add `https://applyguard.vercel.app/api/google/callback` as an authorized redirect URI. Google requires an exact HTTPS redirect-URI match.
-4. In Vercel **Settings → Environment Variables**, add production values for `APP_ORIGIN`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`.
-5. Redeploy, create a Gmail label named `applyguard-jobs`, and use Gmail filters to apply it to the four platforms’ job-alert emails.
+Vercel Functions (only when enabled)
+├── Google OAuth bridge → ephemeral Gmail read-only token
+├── Gmail labeled-alert importer
+├── Jobvetta India search proxy (optional API key)
+└── Startup Jobs source proxy
+```
 
-The consent screen should request **View your email messages and settings** only. ApplyGuard does not retain the refresh token returned by Google, so reconnection is required after the short-lived session expires.
-
-## Run locally
-
-No package installation is required. Open `dist/index.html` in a modern browser. For live source requests, serve the `dist` folder with any static server if your browser restricts network requests from `file://` pages.
-
-### Enable Jobvetta India coverage in Vercel
-
-1. Create a free API key at [Jobvetta](https://www.jobvetta.com/).
-2. In the Vercel project, open **Settings → Environment Variables** and add `JOBVETTA_API_KEY` for **Production**.
-3. Redeploy. The `/api/jobvetta` Vercel Function will then search Product Manager roles in the saved location (for example, Bengaluru) without exposing the key to visitors.
-
-## Repository structure
+## Repository guide
 
 ```text
 dist/
-  index.html     # application markup and accessible workflow screens
-  styles.css     # responsive styles
-  app.js         # local state, resume analysis, sources, ranking, packets
+  index.html                 # Accessible product workflow and content
+  app.js                     # State, parsing, import, ranking, packet creation
+  styles.css                 # Responsive visual system
+api/
+  google/auth.js             # OAuth entry point
+  google/callback.js         # Token exchange and safe popup bridge
+  gmail/jobs.js              # Label-scoped Gmail role-link extraction
+  jobvetta.js                # Optional server-side India search proxy
+  startupjobs.js             # Supplementary public-source proxy
+docs/
+  portfolio-case-study.md    # Portfolio-ready product narrative
+  DEMO_SCRIPT.md             # Walkthrough narration and test data guardrails
+  assets/                    # Recorded product walkthrough
 ```
 
-## Next milestones
+## Run locally
 
-1. Migrate structured local data from `localStorage` to IndexedDB for larger resume files and more robust client-side retention.
-2. Add a labeled evaluation set for fit accuracy, unsupported-claim prevention, and gap detection.
-3. Add a small serverless scheduled discovery service for a genuine daily run, with source consent and an explicit privacy policy.
-4. Add a user-authorized browser extension handoff that still requires visible per-site, final-submit confirmation.
+There is no build step or dependency install. Serve `dist/` with any static server and open it in a modern browser.
 
-## Privacy
+```bash
+cd dist
+python3 -m http.server 4173
+```
 
-Do not commit resumes, contact details, compensation information, cookies, credentials, or application receipts to this repository. The illustrative job data is synthetic.
+Then visit `http://localhost:4173`. Gmail import and server-side source proxies require a Vercel deployment.
+
+## Deploy to Vercel
+
+This repository is a static app plus Vercel Functions. Configure Vercel's output directory as `dist`.
+
+For Gmail alert import, set these variables for the relevant environment (Preview and/or Production):
+
+```text
+APP_ORIGIN=https://your-deployment-url
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+In Google Cloud, add the exact environment-specific values as:
+
+- Authorized JavaScript origin: `https://your-deployment-url`
+- Redirect URI: `https://your-deployment-url/api/google/callback`
+
+For optional Jobvetta coverage, also add `JOBVETTA_API_KEY`. API keys are read only inside the serverless function and are never sent to the browser.
+
+## Important boundaries
+
+- LinkedIn, Naukri, IIMJobs, and Instahyre are imported through candidate-controlled alerts; this app does **not** scrape their protected pages.
+- Google access is `gmail.readonly`, scoped by the label query, and uses an ephemeral browser-session token. Refresh tokens are not retained.
+- Resume parsing happens in-browser. PDF/DOCX parsing loads an open-source parser at runtime; when that cannot load, paste the extracted text instead.
+- `localStorage` is device/browser scoped and not encrypted. Do not use a shared browser profile for private career data.
+- Do not commit resumes, OAuth credentials, API keys, or exported user data.
+
+## Roadmap
+
+1. Move structured local data to IndexedDB for more resilient client-side storage.
+2. Build a labeled evaluation set for fit quality, unsupported-claim prevention, and gap detection.
+3. Add a candidate-authorized scheduled discovery service with encrypted token storage, an account model, and a privacy policy.
+4. Explore a browser-extension handoff that still requires a visible, candidate-confirmed final submission.
+
+## License
+
+This is a portfolio project. Do not reuse it to collect candidate data without implementing appropriate privacy, security, and consent controls.

@@ -240,7 +240,7 @@ async function runSearch() {
     }
     renderSources(); renderJobs();
   } catch (error) { setStatus('#searchStatus', `Search could not finish: ${error.message}`, true); }
-  finally { $('#runSearch').disabled = false; $('#runSearch').textContent = 'Run today’s search'; }
+  finally { $('#runSearch').disabled = false; $('#runSearch').textContent = 'Search open feeds'; }
 }
 function isProductJob(job) { return /product manager|product owner|product lead|product analyst|product director|growth product/i.test(`${job.title} ${job.description}`); }
 function dedupeJobs(jobs) { const seen = new Set(); return jobs.filter(job => { const key = `${job.company}|${job.title}|${job.location}`.toLowerCase().replace(/\s+/g,' '); if (seen.has(key)) return false; seen.add(key); return true; }); }
@@ -315,6 +315,25 @@ const DEMO_JOBS = [
   {id:'demo:3',source:'Illustrative demo',title:'Platform Product Manager',company:'Workflow Systems',location:'Remote',postedAt:new Date(Date.now()-36e5*18).toISOString(),url:'https://example.com',tags:['B2B','API'],description:'Own B2B platform capabilities, developer APIs and enterprise onboarding. Define roadmap with engineering and customer teams.'}
 ];
 
+function enablePortfolioDemo() {
+  if (new URLSearchParams(window.location.search).get('demo') !== '1') return;
+  const evidence = [
+    { id: 'demo-evidence-1', title: 'Growth experimentation', text: 'Led A/B experiments across an onboarding and marketplace funnel, improving conversion by 12%.', verified: true },
+    { id: 'demo-evidence-2', title: 'Customer discovery', text: 'Used customer interviews and analytics to prioritize a consumer product roadmap.', verified: true },
+    { id: 'demo-evidence-3', title: 'Cross-functional delivery', text: 'Partnered with engineering and design to ship activation and retention improvements.', verified: true }
+  ];
+  state = {
+    ...structuredClone(DEFAULT_STATE),
+    resume: { text: 'Illustrative portfolio demo profile. No personal data is stored or shown.', fileName: '', updatedAt: NOW() },
+    profile: { name: 'Demo Candidate', roles: 'Growth Product Manager, Product Manager', industries: 'Consumer / ecommerce, Health-tech', location: 'Bengaluru, Remote', authorization: 'India work authorization', signals: ['Product strategy', 'Experimentation', 'Analytics', 'User research', 'Growth', 'Consumer product', 'Cross-functional delivery'], evidence },
+    jobs: structuredClone(DEMO_JOBS),
+    decisions: { 'demo:1': 'approved' },
+    packet: { jobId: 'demo:1', summary: 'I am interested in this Growth Product Manager role because it aligns with my verified experience in experimentation, growth, and consumer product delivery. I would be transparent about any domain-specific gaps identified in the review.', answers: { portfolio: 'https://example.com/portfolio' }, savedAt: NOW() },
+    lastRun: NOW(),
+    sourceRuns: [{ name: 'Illustrative portfolio demo', status: 'ok', message: 'Sample roles only — no live data used' }]
+  };
+}
+
 function bind() {
   $('#resumeFile').addEventListener('change', async e => {
     const file = e.target.files[0]; if (!file) return; setStatus('#resumeStatus', `Reading ${file.name} in this browser…`);
@@ -335,6 +354,7 @@ function bind() {
 }
 
 function init() {
+  enablePortfolioDemo();
   if ('BroadcastChannel' in window) {
     googleAuthChannel = new BroadcastChannel('applyguard-google-auth');
     googleAuthChannel.addEventListener('message', event => receiveGoogleConnection(event.data));
