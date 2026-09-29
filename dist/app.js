@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
   sourceRuns: []
 };
 let state = load();
+let googleAuthChannel = null;
 state.jobs = compactJobs(state.jobs || []);
 state.weights = { ...DEFAULT_STATE.weights, ...Object.fromEntries(Object.entries(state.weights || {}).filter(([key]) => key in DEFAULT_STATE.weights)) };
 if (Object.values(state.weights).reduce((sum, value) => sum + value, 0) !== 100) allocateWeight('skills', state.weights.skills);
@@ -155,18 +156,23 @@ function renderInbox() {
   const last = state.gmail?.lastImport ? `Last import: ${new Date(state.gmail.lastImport).toLocaleString()} · ${state.gmail.messagesScanned || 0} alert emails scanned.` : 'No alert email has been imported yet.';
   $('#gmailImportStatus').textContent = last;
 }
+function receiveGoogleConnection(data) {
+  if (data?.type !== 'applyguard-google-auth') return;
+  if (data.error || !data.accessToken) { setStatus('#gmailImportStatus', data.error || 'Google connection did not finish.', true); return; }
+  const expiresAt = Date.now() + Math.max(60, Number(data.expiresIn || 3600) - 60) * 1000;
+  sessionStorage.setItem('applyguard.gmail.accessToken', data.accessToken);
+  sessionStorage.setItem('applyguard.gmail.expiresAt', String(expiresAt));
+  state.gmail = { ...state.gmail, connected: true, expiresAt: new Date(expiresAt).toISOString() };
+  persist('Gmail alert inbox connected', 'Read-only access token kept only for this browser session');
+  renderInbox(); setStatus('#gmailImportStatus', 'Google connected. You can now import emails labeled applyguard-jobs.');
+}
 function connectGmail() {
   const popup = window.open('/api/google/auth', 'applyguard-google-auth', 'width=520,height=680');
   if (!popup) { setStatus('#gmailImportStatus', 'Allow pop-ups for ApplyGuard, then connect Google again.', true); return; }
   const receive = event => {
     if (event.origin !== window.location.origin || event.data?.type !== 'applyguard-google-auth') return;
     window.removeEventListener('message', receive);
-    if (event.data.error || !event.data.accessToken) { setStatus('#gmailImportStatus', event.data.error || 'Google connection did not finish.', true); return; }
-    const expiresAt = Date.now() + Math.max(60, Number(event.data.expiresIn || 3600) - 60) * 1000;
-    sessionStorage.setItem('applyguard.gmail.accessToken', event.data.accessToken);
-    sessionStorage.setItem('applyguard.gmail.expiresAt', String(expiresAt));
-    state.gmail = { ...state.gmail, connected: true, expiresAt: new Date(expiresAt).toISOString() };
-    persist('Gmail alert inbox connected', 'Read-only access token kept only for this browser session'); renderInbox();
+    receiveGoogleConnection(event.data);
   };
   window.addEventListener('message', receive);
 }
@@ -319,5 +325,11 @@ function bind() {
   $('#deleteData').addEventListener('click', () => { if(confirm('Delete your resume text, profile, job decisions, packets, and audit history from this browser? This cannot be undone.')) { localStorage.removeItem(STORAGE_KEY); state=structuredClone(DEFAULT_STATE); location.reload(); } });
 }
 
-function init() { renderProfile(); renderInbox(); renderSources(); renderWeights(); renderJobs(); renderPacket(); bind(); }
+function init() {
+  if ('BroadcastChannel' in window) {
+    googleAuthChannel = new BroadcastChannel('applyguard-google-auth');
+    googleAuthChannel.addEventListener('message', event => receiveGoogleConnection(event.data));
+  }
+  renderProfile(); renderInbox(); renderSources(); renderWeights(); renderJobs(); renderPacket(); bind();
+}
 init();
