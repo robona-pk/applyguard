@@ -39,7 +39,7 @@ export default {
   async fetch(request) {
     const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
     if (!token) return Response.json({ error: 'Connect Google before importing alerts.' }, { status: 401 });
-    const query = new URL(request.url).searchParams.get('q') || 'label:applyguard-jobs newer_than:14d';
+    const query = new URL(request.url).searchParams.get('q') || 'label:rolewise-jobs newer_than:14d';
     try {
       const list = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${new URLSearchParams({ q: query, maxResults: '40' })}`, { headers: { Authorization: `Bearer ${token}` } });
       const index = await list.json();

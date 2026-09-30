@@ -1,10 +1,10 @@
-# FindAMatch
+# Rolewise
 
 **A local-first, evidence-grounded job-search copilot for product managers.**
 
-FindAMatch turns a candidate's resume into a reviewable profile, imports only the job-alert emails they explicitly label, applies hard eligibility filters, ranks the remaining roles with an inspectable model, and prepares an editable application packet. It is decision support—not an auto-apply bot.
+Rolewise turns a candidate's resume into a reviewable profile, imports only the job-alert emails they explicitly label, applies hard eligibility filters, ranks the remaining roles with an inspectable model, and prepares an editable application packet. It is decision support—not an auto-apply bot.
 
-[Open the live app](https://applyguard.vercel.app) · [Watch the walkthrough](./docs/assets/applyguard-walkthrough.mov) · [Read the product case study](./docs/portfolio-case-study.md)
+[Open the live app](https://rolewise-pk.vercel.app) · [Watch the walkthrough](./docs/assets/applyguard-walkthrough.mov) · [Read the product case study](./docs/portfolio-case-study.md)
 
 > **Portfolio build.** This project demonstrates product judgment as much as implementation: where automation is useful, where it is risky, and how to preserve a candidate's control over their own career data and applications.
 
@@ -12,7 +12,7 @@ FindAMatch turns a candidate's resume into a reviewable profile, imports only th
 
 Job search tools often make two unhelpful trade-offs: they either flood candidates with undifferentiated listings or promise autonomous applications that can make unsupported claims on their behalf. Product managers need a faster way to find opportunities **and** a trustworthy way to judge fit.
 
-FindAMatch is designed around a smaller, more credible loop:
+Rolewise is designed around a smaller, more credible loop:
 
 ```text
 Resume → editable evidence ledger → labeled job alerts → hard eligibility gates
@@ -23,7 +23,7 @@ Resume → editable evidence ledger → labeled job alerts → hard eligibility 
 
 - **Local resume analysis** — paste or load a TXT, PDF, or DOCX resume. Text, profile data, decisions, and packets remain in the browser's `localStorage`.
 - **Verified evidence ledger** — extracted achievements are hypotheses until the candidate reviews and saves them. Only verified evidence can support a recommendation or packet.
-- **Candidate-controlled Gmail import** — after explicit Google OAuth consent, the app reads only emails carrying the `applyguard-jobs` label and extracts original LinkedIn, Naukri, IIMJobs, and Instahyre links.
+- **Candidate-controlled Gmail import** — after explicit Google OAuth consent, the app reads only emails carrying the `rolewise-jobs` label and extracts original LinkedIn, Naukri, IIMJobs, and Instahyre links.
 - **Supplementary open-feed search** — an on-demand search checks permitted public feeds for extra startup and remote roles. It does not scrape protected job boards.
 - **Hard filters before ranking** — target role and location are eligibility gates. A role that fails either is shown as excluded, never promoted because it has matching keywords.
 - **Transparent soft-signal ranking** — skill signals, industry alignment, and seniority are adjustable local weights that always total 100%.
@@ -33,7 +33,7 @@ Resume → editable evidence ledger → labeled job alerts → hard eligibility 
 
 1. Upload or paste a resume and review the suggested profile.
 2. Correct the inferred signals, add evidence, target roles, industries, and location; then save the verified profile.
-3. Create job alerts on preferred boards and apply the Gmail label `applyguard-jobs`.
+3. Create job alerts on preferred boards and apply the Gmail label `rolewise-jobs`.
 4. Connect Google with read-only access and import only those labeled alerts—or run the supplementary public-feed search.
 5. Review ranked eligible roles, fit signals, evidence, and gaps.
 6. Approve a role to create a packet, complete the checklist, and hand off to the official job page.
@@ -45,7 +45,7 @@ The recorded walkthrough uses illustrative data only. See the [demo script](./do
 | Decision | Why it matters |
 | --- | --- |
 | `localStorage` by default | A portfolio MVP should not silently centralize resumes, job decisions, or application data. |
-| Gmail labels as the import boundary | The candidate chooses exactly which emails FindAMatch may read; it never scans the full inbox. |
+| Gmail labels as the import boundary | The candidate chooses exactly which emails Rolewise may read; it never scans the full inbox. |
 | Role + location as hard filters | Eligibility should not be diluted by a scoring model. Bengaluru and Bangalore are treated as the same location. |
 | Evidence ledger before explanations | The product cannot turn weak resume inference into a confident claim. |
 | No autofill or submit | A job application is representational and high stakes. The candidate reviews and submits on the employer's site. |

@@ -7,17 +7,17 @@ function trustedAppOrigin(value, fallback) {
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:') return fallback;
-    if (url.origin === fallback || /^https:\/\/applyguard-[a-z0-9]+-alternateprerna-gmailcoms-projects\.vercel\.app$/i.test(url.origin)) return url.origin;
+    if (url.origin === fallback || /^https:\/\/rolewise-[a-z0-9]+-alternateprerna-gmailcoms-projects\.vercel\.app$/i.test(url.origin)) return url.origin;
   } catch { /* use the configured origin */ }
   return fallback;
 }
 
 function page(message, payload = {}, targetOrigin = (process.env.APP_ORIGIN || '').replace(/\/$/, '')) {
-  const data = JSON.stringify({ type: 'applyguard-google-auth', ...payload }).replace(/</g, '\\u003c');
+  const data = JSON.stringify({ type: 'rolewise-google-auth', ...payload }).replace(/</g, '\\u003c');
   const headers = new Headers({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-  headers.append('Set-Cookie', 'applyguard_oauth_state=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
-  headers.append('Set-Cookie', 'applyguard_oauth_parent=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
-  return new Response(`<!doctype html><title>FindAMatch</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify(targetOrigin)};try{localStorage.setItem('applyguard.googleAuthResult',JSON.stringify(result));setTimeout(()=>localStorage.removeItem('applyguard.googleAuthResult'),15000)}catch{}try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('applyguard-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),700)</script>`, { headers });
+  headers.append('Set-Cookie', 'rolewise_oauth_state=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
+  headers.append('Set-Cookie', 'rolewise_oauth_parent=; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
+  return new Response(`<!doctype html><title>Rolewise</title><p>${message}</p><script>const result=${data};const target=${JSON.stringify(targetOrigin)};try{localStorage.setItem('rolewise.googleAuthResult',JSON.stringify(result));setTimeout(()=>localStorage.removeItem('rolewise.googleAuthResult'),15000)}catch{}try{window.opener&&window.opener.postMessage(result,target)}catch{}try{new BroadcastChannel('rolewise-google-auth').postMessage(result)}catch{}setTimeout(()=>window.close(),700)</script>`, { headers });
 }
 
 export default {
@@ -26,8 +26,8 @@ export default {
     const url = new URL(request.url);
     const state = url.searchParams.get('state') || '';
     const code = url.searchParams.get('code');
-    const parentOrigin = trustedAppOrigin(decodeURIComponent(cookie(request, 'applyguard_oauth_parent') || origin), origin);
-    if (!origin || !code || !state || state !== cookie(request, 'applyguard_oauth_state')) return page('Google connection could not be verified. Please close this window and try again.', { error: 'OAuth state validation failed.' }, parentOrigin);
+    const parentOrigin = trustedAppOrigin(decodeURIComponent(cookie(request, 'rolewise_oauth_parent') || origin), origin);
+    if (!origin || !code || !state || state !== cookie(request, 'rolewise_oauth_state')) return page('Google connection could not be verified. Please close this window and try again.', { error: 'OAuth state validation failed.' }, parentOrigin);
     try {
       const body = new URLSearchParams({
         code,

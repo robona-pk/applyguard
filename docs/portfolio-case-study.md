@@ -1,4 +1,4 @@
-# FindAMatch — portfolio case study
+# Rolewise — portfolio case study
 
 ## A job-search copilot that helps candidates decide, without pretending to be them
 
@@ -10,13 +10,13 @@
 
 Applying for product roles is fragmented: candidates track job boards, compare vague descriptions with an evolving resume, and repeatedly reconstruct the same application context. Existing tools tend to optimize for volume, not confidence. At the other extreme, "auto-apply" products can make unsupported claims or submit applications without meaningful review.
 
-The hypothesis behind FindAMatch was that a useful AI workflow should reduce the manual synthesis work while leaving high-stakes representation with the candidate.
+The hypothesis behind Rolewise was that a useful AI workflow should reduce the manual synthesis work while leaving high-stakes representation with the candidate.
 
 ## The product loop
 
 1. The candidate adds a resume. The browser suggests skills, industries, roles, and evidence candidates.
 2. The candidate reviews that interpretation in an evidence ledger. Unverified items are not used as proof.
-3. The candidate labels job-alert emails they want considered. FindAMatch imports only those emails with Gmail read-only access.
+3. The candidate labels job-alert emails they want considered. Rolewise imports only those emails with Gmail read-only access.
 4. Target role and location become hard eligibility checks. Soft signals are transparent weights, not hidden model behavior.
 5. Every eligible job shows supporting signals, evidence, explicit gaps, and a non-predictive recommendation.
 6. The candidate approves a role only after review. The product creates a packet and opens the official job page; it never submits an application.
@@ -58,6 +58,6 @@ Each stage has an observable output and a clear boundary:
 
 ## Demo
 
-- [Live app](https://applyguard.vercel.app)
-- [Source repository](https://github.com/robona-pk/applyguard)
+- [Live app](https://rolewise-pk.vercel.app)
+- [Source repository](https://github.com/robona-pk/rolewise)
 - [Walkthrough recording](./assets/applyguard-walkthrough.mov)

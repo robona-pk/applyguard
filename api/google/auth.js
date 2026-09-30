@@ -7,7 +7,7 @@ function trustedAppOrigin(value, fallback) {
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:') return fallback;
-    if (url.origin === fallback || /^https:\/\/applyguard-[a-z0-9]+-alternateprerna-gmailcoms-projects\.vercel\.app$/i.test(url.origin)) return url.origin;
+    if (url.origin === fallback || /^https:\/\/rolewise-[a-z0-9]+-alternateprerna-gmailcoms-projects\.vercel\.app$/i.test(url.origin)) return url.origin;
   } catch { /* use the configured origin */ }
   return fallback;
 }
@@ -34,8 +34,8 @@ export default {
       state
     }).toString();
     const headers = new Headers({ Location: url.toString(), 'Cache-Control': 'no-store' });
-    headers.append('Set-Cookie', `applyguard_oauth_state=${state}; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Priority=High`);
-    headers.append('Set-Cookie', `applyguard_oauth_parent=${encodeURIComponent(parentOrigin)}; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Priority=High`);
+    headers.append('Set-Cookie', `rolewise_oauth_state=${state}; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Priority=High`);
+    headers.append('Set-Cookie', `rolewise_oauth_parent=${encodeURIComponent(parentOrigin)}; Path=/api/google; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Priority=High`);
     return new Response(null, { status: 302, headers });
   }
 };

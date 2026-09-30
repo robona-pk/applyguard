@@ -1,6 +1,7 @@
-const STORAGE_KEY = 'applyguard.v2';
+const STORAGE_KEY = 'rolewise.v2';
+const LEGACY_STORAGE_KEY = 'applyguard.v2';
 const MAX_STORED_JOBS = 200;
-const OAUTH_BRIDGE_ORIGIN = 'https://applyguard.vercel.app';
+const OAUTH_BRIDGE_ORIGIN = 'https://rolewise-pk.vercel.app';
 const NOW = () => new Date().toISOString();
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 const $ = (selector) => document.querySelector(selector);
@@ -20,14 +21,17 @@ state.weights = { ...DEFAULT_STATE.weights, ...Object.fromEntries(Object.entries
 if (Object.values(state.weights).reduce((sum, value) => sum + value, 0) !== 100) allocateWeight('skills', state.weights.skills);
 
 function load() {
-  try { return { ...structuredClone(DEFAULT_STATE), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
+    return { ...structuredClone(DEFAULT_STATE), ...JSON.parse(saved) };
+  }
   catch { return structuredClone(DEFAULT_STATE); }
 }
 function persist(event, detail = '') {
   if (event) state.audit.unshift({ at: NOW(), event, detail });
   state.audit = state.audit.slice(0, 100);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; }
-  catch (error) { console.error('FindAMatch could not save local data:', error); return false; }
+  catch (error) { console.error('Rolewise could not save local data:', error); return false; }
 }
 function escapeHtml(value = '') { return String(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c])); }
 function tokens(value = '') { return value.toLowerCase().replace(/[^a-z0-9+#/ ]/g, ' ').split(/\s+/).filter(x => x.length > 2); }
@@ -143,8 +147,8 @@ function normalizeJob(raw, source) {
 }
 
 function gmailToken() {
-  const token = sessionStorage.getItem('applyguard.gmail.accessToken');
-  const expiresAt = Number(sessionStorage.getItem('applyguard.gmail.expiresAt') || 0);
+  const token = sessionStorage.getItem('rolewise.gmail.accessToken');
+  const expiresAt = Number(sessionStorage.getItem('rolewise.gmail.expiresAt') || 0);
   return token && expiresAt > Date.now() ? token : '';
 }
 function gmailConnected() { return Boolean(gmailToken()); }
@@ -158,28 +162,28 @@ function renderInbox() {
   $('#gmailImportStatus').textContent = last;
 }
 function receiveGoogleConnection(data) {
-  if (data?.type !== 'applyguard-google-auth') return;
+  if (data?.type !== 'rolewise-google-auth') return;
   if (data.error || !data.accessToken) { setStatus('#gmailImportStatus', data.error || 'Google connection did not finish.', true); return; }
   const expiresAt = Date.now() + Math.max(60, Number(data.expiresIn || 3600) - 60) * 1000;
-  sessionStorage.setItem('applyguard.gmail.accessToken', data.accessToken);
-  sessionStorage.setItem('applyguard.gmail.expiresAt', String(expiresAt));
+  sessionStorage.setItem('rolewise.gmail.accessToken', data.accessToken);
+  sessionStorage.setItem('rolewise.gmail.expiresAt', String(expiresAt));
   state.gmail = { ...state.gmail, connected: true, expiresAt: new Date(expiresAt).toISOString() };
   persist('Gmail alert inbox connected', 'Read-only access token kept only for this browser session');
-  renderInbox(); setStatus('#gmailImportStatus', 'Google connected. You can now import emails labeled applyguard-jobs.');
+  renderInbox(); setStatus('#gmailImportStatus', 'Google connected. You can now import emails labeled rolewise-jobs.');
 }
 function receiveStoredGoogleConnection() {
   try {
-    const stored = localStorage.getItem('applyguard.googleAuthResult');
+    const stored = localStorage.getItem('rolewise.googleAuthResult');
     if (!stored) return;
-    localStorage.removeItem('applyguard.googleAuthResult');
+    localStorage.removeItem('rolewise.googleAuthResult');
     receiveGoogleConnection(JSON.parse(stored));
-  } catch { localStorage.removeItem('applyguard.googleAuthResult'); }
+  } catch { localStorage.removeItem('rolewise.googleAuthResult'); }
 }
 function connectGmail() {
-  const popup = window.open(`${OAUTH_BRIDGE_ORIGIN}/api/google/auth?parent_origin=${encodeURIComponent(window.location.origin)}`, 'applyguard-google-auth', 'width=520,height=680');
-  if (!popup) { setStatus('#gmailImportStatus', 'Allow pop-ups for FindAMatch, then connect Google again.', true); return; }
+  const popup = window.open(`${OAUTH_BRIDGE_ORIGIN}/api/google/auth?parent_origin=${encodeURIComponent(window.location.origin)}`, 'rolewise-google-auth', 'width=520,height=680');
+  if (!popup) { setStatus('#gmailImportStatus', 'Allow pop-ups for Rolewise, then connect Google again.', true); return; }
   const receive = event => {
-    if (![window.location.origin, OAUTH_BRIDGE_ORIGIN].includes(event.origin) || event.data?.type !== 'applyguard-google-auth') return;
+    if (![window.location.origin, OAUTH_BRIDGE_ORIGIN].includes(event.origin) || event.data?.type !== 'rolewise-google-auth') return;
     window.removeEventListener('message', receive);
     receiveGoogleConnection(event.data);
   };
@@ -188,7 +192,7 @@ function connectGmail() {
 async function importGmailAlerts() {
   const token = gmailToken();
   if (!token) { renderInbox(); setStatus('#gmailImportStatus', 'Your Google connection expired. Connect again to import alerts.', true); return; }
-  $('#importAlerts').disabled = true; $('#importAlerts').textContent = 'Importing alerts…'; setStatus('#gmailImportStatus', 'Reading only emails labeled applyguard-jobs…');
+  $('#importAlerts').disabled = true; $('#importAlerts').textContent = 'Importing alerts…'; setStatus('#gmailImportStatus', 'Reading only emails labeled rolewise-jobs…');
   try {
     const response = await fetch('/api/gmail/jobs', { headers: { Authorization: `Bearer ${token}` } });
     const data = await response.json();
@@ -270,7 +274,7 @@ function assess(job) {
   return { score, verdict, components: { skills, industry, seniority }, signalHits, evidenceHits, gaps, hardFailures, hardPass: !hardFailures.length };
 }
 
-function renderSources() { const target = $('#sourceStatus'); const alertSources = ['LinkedIn', 'Naukri', 'IIMJobs', 'Instahyre'].map(name => ({ name, status: state.gmail?.lastImport ? 'ok' : 'warn', message: state.gmail?.lastImport ? 'Read from labeled alert inbox' : 'Create an alert, then label its email applyguard-jobs' })); const sourceRuns = state.sourceRuns.length ? [...alertSources, ...state.sourceRuns] : alertSources; target.innerHTML = sourceRuns.map(s => `<div class="source ${s.status}"><strong>${s.status === 'ok' ? '●' : '○'} ${escapeHtml(s.name)}</strong><span>${escapeHtml(s.message)}</span></div>`).join(''); $('#lastRun').textContent = state.lastRun ? `Last import/search: ${new Date(state.lastRun).toLocaleString()}` : 'No import or search run yet'; }
+function renderSources() { const target = $('#sourceStatus'); const alertSources = ['LinkedIn', 'Naukri', 'IIMJobs', 'Instahyre'].map(name => ({ name, status: state.gmail?.lastImport ? 'ok' : 'warn', message: state.gmail?.lastImport ? 'Read from labeled alert inbox' : 'Create an alert, then label its email rolewise-jobs' })); const sourceRuns = state.sourceRuns.length ? [...alertSources, ...state.sourceRuns] : alertSources; target.innerHTML = sourceRuns.map(s => `<div class="source ${s.status}"><strong>${s.status === 'ok' ? '●' : '○'} ${escapeHtml(s.name)}</strong><span>${escapeHtml(s.message)}</span></div>`).join(''); $('#lastRun').textContent = state.lastRun ? `Last import/search: ${new Date(state.lastRun).toLocaleString()}` : 'No import or search run yet'; }
 function renderWeights() { const total = Object.values(state.weights).reduce((sum, value) => sum + value, 0); $('#weights').innerHTML = `<section class="hard-filter-note"><strong>Hard filters</strong><span>Target role and location are configured in your profile. Jobs that fail either are excluded before scoring.</span></section><p class="small muted">${total}% allocated across soft signals. Compensation is intentionally unscored until a source provides a comparable salary range.</p>` + Object.entries(state.weights).map(([key, value]) => `<div class="weight"><label>${key[0].toUpperCase()+key.slice(1)} <span>${value}%</span><input type="range" min="0" max="100" value="${value}" data-weight="${key}"></label></div>`).join(''); }
 function allocateWeight(changedKey, requested) {
   const keys = Object.keys(state.weights); const next = Math.max(0, Math.min(100, requested)); const others = keys.filter(key => key !== changedKey);
@@ -283,7 +287,7 @@ function allocateWeight(changedKey, requested) {
 function renderJobs() {
   const target = $('#jobsList'); const assessed = recentJobs().map(job => ({ job, match: assess(job) })); const excluded = assessed.filter(item => !item.match.hardPass); const jobs = assessed.filter(item => item.match.hardPass).sort((a,b) => b.match.score - a.match.score);
   $('#jobCount').textContent = `${jobs.length} eligible roles${excluded.length ? ` · ${excluded.length} excluded by hard filters` : ''}`;
-  if (!jobs.length) { target.innerHTML = `<div class="empty-state"><strong>No roles passed your hard filters.</strong><p>FindAMatch received ${assessed.length} recent product roles, but ${excluded.length} did not match your saved target role or location.</p><p class="small">Your current location requirement is <strong>${escapeHtml(state.profile.location || 'not set')}</strong>. Bengaluru and Bangalore are treated as the same place. Remote roles pass only if you add “Remote” to your location preference.</p>${excluded.length ? `<details><summary>Show the first ${Math.min(excluded.length, 5)} excluded roles and reasons</summary><div class="excluded-list">${excluded.slice(0,5).map(({job,match}) => `<p><strong>${escapeHtml(job.title)}</strong> · ${escapeHtml(job.location)}<br><span class="muted small">${escapeHtml(match.hardFailures.join(' '))}</span></p>`).join('')}</div></details>` : ''}</div>`; return; }
+  if (!jobs.length) { target.innerHTML = `<div class="empty-state"><strong>No roles passed your hard filters.</strong><p>Rolewise received ${assessed.length} recent product roles, but ${excluded.length} did not match your saved target role or location.</p><p class="small">Your current location requirement is <strong>${escapeHtml(state.profile.location || 'not set')}</strong>. Bengaluru and Bangalore are treated as the same place. Remote roles pass only if you add “Remote” to your location preference.</p>${excluded.length ? `<details><summary>Show the first ${Math.min(excluded.length, 5)} excluded roles and reasons</summary><div class="excluded-list">${excluded.slice(0,5).map(({job,match}) => `<p><strong>${escapeHtml(job.title)}</strong> · ${escapeHtml(job.location)}<br><span class="muted small">${escapeHtml(match.hardFailures.join(' '))}</span></p>`).join('')}</div></details>` : ''}</div>`; return; }
   target.innerHTML = jobs.map(({job,match}) => {
     const decision = state.decisions[job.id];
     return `<article class="job-card ${decision === 'approved' ? 'selected' : ''}"><div class="job-top"><div><div class="job-title">${escapeHtml(job.title)}</div><div class="job-company">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</div></div><div class="score-circle" style="--score:${match.score * 3.6}deg"><b>${match.score}</b></div></div><div class="job-meta"><span class="tag good">${escapeHtml(match.verdict)}</span><span class="tag">${escapeHtml(job.source)}</span><span class="tag">${formatDate(job.postedAt)}</span></div><div class="match-reason"><p><strong>Why it may fit:</strong> ${match.signalHits.length ? escapeHtml(match.signalHits.join(' · ')) : 'Role/title alignment only; validate skills.'}</p><p><strong>Verified evidence:</strong> ${match.evidenceHits.length ? escapeHtml(match.evidenceHits.map(x=>x.title).join(' · ')) : 'No direct keyword evidence was found—review before using a claim.'}</p>${match.gaps.length ? `<p><strong>Gaps to review:</strong> ${escapeHtml(match.gaps.join(' '))}</p>` : ''}</div><div class="job-actions">${job.url ? `<button class="secondary" data-open="${escapeHtml(job.id)}">View role ↗</button>` : '<span class="tag gap">Source did not provide an application link</span>'}<button class="secondary" data-decision="reject" data-job="${escapeHtml(job.id)}">${decision === 'rejected' ? 'Rejected' : 'Reject'}</button><button class="primary" data-decision="approve" data-job="${escapeHtml(job.id)}">${decision === 'approved' ? 'Approved — view packet' : 'Approve & create packet'}</button></div></article>`;
@@ -349,18 +353,18 @@ function bind() {
   $('#resetDemo').addEventListener('click', () => { state.jobs = structuredClone(DEMO_JOBS); state.sourceRuns = [{name:'Illustrative demo',status:'ok',message:'3 sample roles loaded'},{name:'Public sources',status:'warn',message:'Use Run today’s search for live feeds'}]; state.lastRun = NOW(); persist('Illustrative jobs loaded', 'Demo data only'); renderSources(); renderJobs(); });
   $('#jobsList').addEventListener('click', e => { const button = e.target instanceof Element ? e.target.closest('button') : null; if (!button) return; const id = button.dataset.job; if (id && button.dataset.decision) decide(id, button.dataset.decision); const open = button.dataset.open; if (open) { const job=state.jobs.find(x=>x.id===open); if(job?.url) window.open(job.url, '_blank', 'noopener'); } });
   $('#savePacket').addEventListener('click', savePacket); $('#openJob').addEventListener('click', () => { const job=state.jobs.find(x=>x.id===state.packet?.jobId); if(job?.url) { savePacket(); persist('Official job page opened', job.title); window.open(job.url, '_blank', 'noopener'); renderPacket(); } });
-  $('#exportData').addEventListener('click', () => { const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;a.download='applyguard-local-data.json';a.click();URL.revokeObjectURL(url); });
+  $('#exportData').addEventListener('click', () => { const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;a.download='rolewise-local-data.json';a.click();URL.revokeObjectURL(url); });
   $('#deleteData').addEventListener('click', () => { if(confirm('Delete your resume text, profile, job decisions, packets, and audit history from this browser? This cannot be undone.')) { localStorage.removeItem(STORAGE_KEY); state=structuredClone(DEFAULT_STATE); location.reload(); } });
 }
 
 function init() {
   enablePortfolioDemo();
   if ('BroadcastChannel' in window) {
-    googleAuthChannel = new BroadcastChannel('applyguard-google-auth');
+    googleAuthChannel = new BroadcastChannel('rolewise-google-auth');
     googleAuthChannel.addEventListener('message', event => receiveGoogleConnection(event.data));
   }
   window.addEventListener('storage', event => {
-    if (event.key !== 'applyguard.googleAuthResult' || !event.newValue) return;
+    if (event.key !== 'rolewise.googleAuthResult' || !event.newValue) return;
     receiveStoredGoogleConnection();
   });
   receiveStoredGoogleConnection();
